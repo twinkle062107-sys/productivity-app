@@ -1,0 +1,31 @@
+---
+description: QuestDaily product, architecture, and build order
+alwaysApply: true
+---
+
+# QuestDaily
+
+Read `PROJECT.md` before generating code. This is a game-like quest app, not a
+generic to-do list.
+
+## Scope
+
+Build one vertical slice at a time. Do not implement Auth, Quest CRUD, or the
+gamification engine until the user confirms the current phase.
+
+Lead differentiators (first-class, not extras): Quest Chains, Boss Battles,
+earned streak freeze tokens, adaptive difficulty, weekly cosmetic Seasons.
+
+## Stack
+
+Next.js App Router, TS strict, Tailwind, shadcn restyled to the QuestDaily
+look, Prisma + Postgres, Auth.js v5, Zustand, TanStack Query, Framer Motion,
+Zod, Server Actions only for mutations.
+
+Keep XP/level/streak math in `lib/gamification/` with zero framework imports.
+Every gamification change writes an `Event` row.
+
+## Routes
+
+`(marketing)` landing, `(auth)` sign-in, `(app)` dashboard / quests /
+quests/[id] / profile / achievements. Mobile-first; bottom nav in the app shell.

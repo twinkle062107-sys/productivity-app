@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+
+  level         Int       @default(1)
+  currentXp     Int       @default(0)
+  points        Int       @default(0)
+  diamonds      Int       @default(0)
+  streakCount   Int       @default(0)
+  streakFreezes Int       @default(0)
+  longestStreak Int       @default(0)
+  lastActiveDay DateTime?
+
+  accounts     Account[]
+  sessions     Session[]
+  quests       Quest[]
+  bosses       Boss[]
+  chains       QuestChain[]
+  achievements UserAchievement[]
+  events       Event[]
+  cosmetics    UserCosmetic[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Quest {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  category    String?
+  difficulty  String     @default("MEDIUM")
+  frequency   String     @default("DAILY")
+  rrule       String?
+  scheduledAt DateTime?
+  reminderOn  Boolean    @default(true)
+  chainId     String?
+  chain       QuestChain? @relation(fields: [chainId], references: [id])
+  chapterIndex Int?
+  bossId      String?
+  boss        Boss?      @relation(fields: [bossId], references: [id])
+  completions QuestCompletion[]
+  createdAt   DateTime   @default(now())
+  archivedAt  DateTime?
+}
+
+model QuestChain {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  narrative   String?
+  completedAt DateTime?
+  quests      Quest[]
+  createdAt   DateTime @default(now())
+}
+
+model QuestCompletion {
+  id          String   @id @default(cuid())
+  questId     String
+  quest       Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+  xpAwarded   Int
+  pointsAwarded Int    @default(0)
+  diamondsAwarded Int  @default(0)
+}
+
+model Boss {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  maxHp      Int
+  currentHp  Int
+  defeatedAt DateTime?
+  quests     Quest[]
+  createdAt  DateTime  @default(now())
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  key         String            @unique
+  title       String
+  description String
+  iconUrl     String?
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+model Cosmetic {
+  id     String         @id @default(cuid())
+  key    String         @unique
+  kind   String
+  title  String
+  cost   Int
+  users  UserCosmetic[]
+}
+
+model UserCosmetic {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmeticId String
+  cosmetic   Cosmetic @relation(fields: [cosmeticId], references: [id])
+  equipped   Boolean  @default(false)
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, cosmeticId])
+}

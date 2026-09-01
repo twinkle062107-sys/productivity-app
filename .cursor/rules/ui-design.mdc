@@ -1,0 +1,16 @@
+---
+description: QuestDaily glassmorphism UI matching the ZenZ reference
+globs: app/**/*.tsx,components/**/*.tsx,app/globals.css
+alwaysApply: false
+---
+
+# UI (match `docs/design/reference.png`)
+
+- Canvas `#EEF1FF`, glass cards `rounded-[2rem] bg-white/70 backdrop-blur-xl`
+- Accents: lavender `#7C6CF6`, pink `#FF8FB3`, mint `#5EEAD4`, sun `#FFD56A`
+- CTAs: coral-pink gradient, full width, circular arrow chip on the right
+- Rounded sans (Nunito). Soft colored shadows, never harsh gray boxes
+- App screens: greeting + mascot, Today’s Focus + progress ring, 7-dot streak,
+  pastel category tiles, 2×2 quick actions, bottom tab bar
+- Prefer CSS/SVG clay-glass illustrations over stock photos
+- Mobile-first; on desktop center a phone-width column (`max-w-md`)
