@@ -1,25 +1,57 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import type { User, Quest, QuestCompletion } from "@prisma/client";
 
-const DEMO_EMAIL = "hero@questdaily.app";
+export { ensureOnboardingQuests } from "@/lib/onboarding";
 
 export type QuestWithCompletions = Quest & {
   completions: QuestCompletion[];
 };
+
+export type CurrentUser = User;
 
 export type CurrentUserWithQuests = User & {
   quests: QuestWithCompletions[];
 };
 
 /**
- * Retrieves the current active user, or provisions a local demo user with initial starter quests.
- * When Auth is integrated in a later slice, this can seamlessly map to the authenticated session user.
+ * Returns the currently authenticated user, or redirects to /sign-in.
+ * Must only be called within a request context (Server Component / Server Action).
+ *
+ * NOTE: The legacy demo user (hero@questdaily.app) and its data are intentionally
+ * left untouched. It is no longer referenced by this code path and its data is
+ * preserved for reference.
  */
-export async function getOrCreateCurrentUser(): Promise<CurrentUserWithQuests> {
-  let user = await prisma.user.findFirst({
-    where: {
-      email: DEMO_EMAIL,
-    },
+export async function getCurrentUser(): Promise<CurrentUser> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/sign-in");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+  });
+
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  return user;
+}
+
+/**
+ * Returns the currently authenticated user together with their active quests
+ * (including completions), or redirects to /sign-in.
+ */
+export async function getCurrentUserWithQuests(): Promise<CurrentUserWithQuests> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/sign-in");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
     include: {
       quests: {
         where: { archivedAt: null },
@@ -34,53 +66,7 @@ export async function getOrCreateCurrentUser(): Promise<CurrentUserWithQuests> {
   });
 
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: DEMO_EMAIL,
-        name: "Hero",
-        level: 1,
-        currentXp: 0,
-        diamonds: 0,
-        streakCount: 0,
-        longestStreak: 0,
-        quests: {
-          create: [
-            {
-              title: "Morning Routine & Planning",
-              category: "Health",
-              difficulty: "EASY",
-              frequency: "DAILY",
-              reminderOn: true,
-            },
-            {
-              title: "Deep Work Sprint (45m)",
-              category: "Study",
-              difficulty: "MEDIUM",
-              frequency: "DAILY",
-              reminderOn: true,
-            },
-            {
-              title: "Read 10 pages of a book",
-              category: "Craft",
-              difficulty: "EASY",
-              frequency: "DAILY",
-              reminderOn: true,
-            },
-          ],
-        },
-      },
-      include: {
-        quests: {
-          where: { archivedAt: null },
-          include: {
-            completions: {
-              orderBy: { completedAt: "desc" },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+    redirect("/sign-in");
   }
 
   return user;

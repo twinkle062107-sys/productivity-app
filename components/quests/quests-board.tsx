@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CreateQuestDialog } from "@/components/quests/create-quest-dialog";
 import { QuestItem, type QuestData } from "@/components/quests/quest-item";
 import { BottomNav } from "@/components/layout/bottom-nav";
@@ -11,6 +12,7 @@ export function QuestsBoard({
 }: {
   initialQuests: QuestData[];
 }) {
+  const router = useRouter();
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
   const [filter, setFilter] = useState<"ALL" | "DAILY" | "WEEKLY" | "ONCE">("ALL");
 
@@ -18,6 +20,10 @@ export function QuestsBoard({
     setQuests((prev) =>
       prev.map((q) => (q.id === res.questId ? { ...q, isCompletedToday: true } : q))
     );
+  };
+
+  const handleQuestDeleted = (questId: string) => {
+    setQuests((prev) => prev.filter((q) => q.id !== questId));
   };
 
   const filteredQuests = quests.filter((q) => {
@@ -32,7 +38,7 @@ export function QuestsBoard({
           <h1 className="text-2xl font-extrabold text-qd-ink">Quest Board</h1>
           <p className="text-xs text-qd-muted">Track and conquer your daily challenges</p>
         </div>
-        <CreateQuestDialog onQuestCreated={() => window.location.reload()} />
+        <CreateQuestDialog onQuestCreated={() => router.refresh()} />
       </div>
 
       {/* Filter Tabs */}
@@ -67,6 +73,7 @@ export function QuestsBoard({
               key={quest.id}
               quest={quest}
               onCompleted={handleQuestCompleted}
+              onDeleted={handleQuestDeleted}
             />
           ))
         )}

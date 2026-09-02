@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateCurrentUser } from "@/lib/user";
+import { auth } from "@/lib/auth";
 import {
   calculateRewards,
   calculateLevel,
@@ -43,6 +43,21 @@ function safeRevalidate(path: string) {
 }
 
 /**
+ * Verifies the request is authenticated (defense-in-depth in addition to
+ * proxy.ts route protection). Returns the authenticated user or null.
+ */
+async function requireUser() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return null;
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+  });
+  return user;
+}
+
+/**
  * Creates a new productivity quest for the active user.
  */
 export async function createQuestAction(
@@ -58,7 +73,10 @@ export async function createQuestAction(
     }
 
     const validated = parseResult.data;
-    const user = await getOrCreateCurrentUser();
+    const user = await requireUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to create a quest." };
+    }
 
     const quest = await prisma.quest.create({
       data: {
@@ -99,12 +117,15 @@ export async function completeQuestAction(
     if (!parseResult.success) {
       return {
         success: false,
-        error: "Invalid completion payload",
+        error: "Invalid completion payload.",
       };
     }
 
     const { questId } = parseResult.data;
-    const user = await getOrCreateCurrentUser();
+    const user = await requireUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to complete a quest." };
+    }
 
     const quest = await prisma.quest.findFirst({
       where: {
@@ -122,10 +143,11 @@ export async function completeQuestAction(
     if (!quest) {
       return {
         success: false,
-        error: "Quest not found or already archived.",
+        error: "Quest not found or has been removed.",
       };
     }
 
+    // Use a single Date instance for all calculations and DB writes
     const now = new Date();
 
     // Check if already completed for the designated recurrence period
@@ -138,7 +160,7 @@ export async function completeQuestAction(
     if (alreadyCompleted) {
       return {
         success: false,
-        error: "This quest has already been completed for the current period!",
+        error: "This quest has already been completed for the current period.",
       };
     }
 
@@ -151,7 +173,10 @@ export async function completeQuestAction(
     const newDiamonds = user.diamonds + rewards.diamonds;
     const newLongestStreak = Math.max(user.longestStreak, streakResult.newStreak);
 
-    // Execute atomic transaction for state integrity
+    // Execute atomic transaction for state integrity.
+    // The completion record creation + user update happen together,
+    // so a duplicate request hitting between the check and write will
+    // either see the old state (and re-check) or the new state.
     await prisma.$transaction([
       prisma.questCompletion.create({
         data: {
@@ -226,37 +251,54 @@ export async function completeQuestAction(
     console.error("Failed to complete quest:", error);
     return {
       success: false,
-      error: "Failed to record quest completion. Please try again.",
+      error: "Something went wrong. Please try again.",
     };
   }
 }
 
 /**
- * Deletes or archives a quest.
+ * Archives (soft-deletes) a quest. Returns an error if the quest was not found.
  */
-export async function deleteQuestAction(questId: string): Promise<ActionResult> {
+export async function deleteQuestAction(
+  questId: string
+): Promise<ActionResult<{ id: string }>> {
   try {
-    const user = await getOrCreateCurrentUser();
+    if (!questId || questId.trim().length === 0) {
+      return { success: false, error: "Invalid quest ID." };
+    }
 
-    await prisma.quest.updateMany({
+    const user = await requireUser();
+    if (!user) {
+      return { success: false, error: "You must be signed in to remove a quest." };
+    }
+
+    const result = await prisma.quest.updateMany({
       where: {
         id: questId,
         userId: user.id,
+        archivedAt: null,
       },
       data: {
         archivedAt: new Date(),
       },
     });
 
+    if (result.count === 0) {
+      return {
+        success: false,
+        error: "Quest not found or already removed.",
+      };
+    }
+
     safeRevalidate("/dashboard");
     safeRevalidate("/quests");
 
-    return { success: true };
+    return { success: true, data: { id: questId } };
   } catch (error) {
     console.error("Failed to delete quest:", error);
     return {
       success: false,
-      error: "Unable to delete quest.",
+      error: "Unable to remove quest. Please try again.",
     };
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { BlobMascot } from "@/components/brand/mascots";
 import { ProgressRing } from "@/components/brand/progress-ring";
 import { BottomNav } from "@/components/layout/bottom-nav";
@@ -29,6 +30,7 @@ export function DashboardClient({
   initialUser,
   initialQuests,
 }: DashboardClientProps) {
+  const router = useRouter();
   const [user, setUser] = useState<DashboardUserProps>(initialUser);
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
@@ -90,9 +92,12 @@ export function DashboardClient({
   };
 
   const handleQuestCreated = () => {
-    // When a quest is created via server action, revalidatePath will refresh data on next navigation or full reload
-    // In addition, reload client window state smoothly
-    window.location.reload();
+    // Re-fetch server components to pick up the new quest
+    router.refresh();
+  };
+
+  const handleQuestDeleted = (questId: string) => {
+    setQuests((prev) => prev.filter((q) => q.id !== questId));
   };
 
   // Day of week index for streak display (0 is Sunday, map to Monday-first 0..6)
@@ -231,6 +236,7 @@ export function DashboardClient({
                 key={quest.id}
                 quest={quest}
                 onCompleted={handleQuestCompleted}
+                onDeleted={handleQuestDeleted}
               />
             ))}
           </div>

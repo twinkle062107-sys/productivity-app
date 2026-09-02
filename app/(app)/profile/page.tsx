@@ -1,12 +1,13 @@
 import { BlobMascot } from "@/components/brand/mascots";
 import { BottomNav } from "@/components/layout/bottom-nav";
-import { getOrCreateCurrentUser } from "@/lib/user";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { getCurrentUser } from "@/lib/user";
 import { calculateLevel } from "@/lib/gamification";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const user = await getOrCreateCurrentUser();
+  const user = await getCurrentUser();
   const levelInfo = calculateLevel(user.currentXp);
 
   return (
@@ -20,6 +21,9 @@ export default async function ProfilePage() {
         <p className="mt-1 text-sm font-bold text-qd-lavender">
           {levelInfo.currentLevelXp} / {levelInfo.nextLevelXp} XP to Level {levelInfo.level + 1}
         </p>
+        {user.email && (
+          <p className="mt-1 text-xs font-bold text-qd-muted">{user.email}</p>
+        )}
 
         <div className="mt-6 grid w-full grid-cols-3 gap-3">
           <div className="rounded-2xl bg-white/70 p-3 shadow-sm">
@@ -35,6 +39,8 @@ export default async function ProfilePage() {
             <p className="mt-1 text-lg font-black text-rose-500">{user.streakCount} 🔥</p>
           </div>
         </div>
+
+        <SignOutButton className="mt-5" />
       </div>
       <BottomNav active="/profile" />
     </>

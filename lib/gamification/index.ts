@@ -1,6 +1,8 @@
 /**
  * Pure gamification math and logic.
  * No Next.js, Prisma, or React imports.
+ *
+ * All date comparisons use UTC day boundaries to ensure timezone consistency.
  */
 
 export type Difficulty = "EASY" | "MEDIUM" | "HARD" | "EPIC";
@@ -42,6 +44,36 @@ export interface StreakResult {
 }
 
 /**
+ * Converts a Date or ISO string to a UTC day key (YYYY-MM-DD).
+ * This ensures all day-level comparisons are timezone-safe.
+ */
+export function toUtcDayKey(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Returns the number of UTC days between two dates.
+ * Positive means `later` is after `earlier`.
+ */
+function utcDayDiff(earlier: Date, later: Date): number {
+  const a = Date.UTC(
+    earlier.getUTCFullYear(),
+    earlier.getUTCMonth(),
+    earlier.getUTCDate()
+  );
+  const b = Date.UTC(
+    later.getUTCFullYear(),
+    later.getUTCMonth(),
+    later.getUTCDate()
+  );
+  return Math.round((b - a) / (86400000));
+}
+
+/**
  * Calculates XP and diamond rewards for a given quest difficulty.
  */
 export function calculateRewards(difficulty: Difficulty): RewardResult {
@@ -72,6 +104,7 @@ export function calculateLevel(totalXp: number): LevelInfo {
 
 /**
  * Calculates streak updates based on the user's last active date and current date.
+ * Uses UTC day boundaries to avoid timezone issues around midnight.
  */
 export function calculateStreak(
   lastActiveDay: Date | string | null,
@@ -86,16 +119,10 @@ export function calculateStreak(
     };
   }
 
-  const lastDate = new Date(lastActiveDay);
-  const nowDate = new Date(now);
-
-  const startOfLast = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate()).getTime();
-  const startOfNow = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
-
-  const dayDiff = Math.round((startOfNow - startOfLast) / (1000 * 60 * 60 * 24));
+  const lastDate = typeof lastActiveDay === "string" ? new Date(lastActiveDay) : lastActiveDay;
+  const dayDiff = utcDayDiff(lastDate, now);
 
   if (dayDiff === 0) {
-    // Already completed something today
     return {
       newStreak: Math.max(1, currentStreak),
       streakIncreased: false,
@@ -104,7 +131,6 @@ export function calculateStreak(
   }
 
   if (dayDiff === 1) {
-    // Consecutive day
     return {
       newStreak: Math.max(0, currentStreak) + 1,
       streakIncreased: true,
@@ -122,6 +148,7 @@ export function calculateStreak(
 
 /**
  * Checks if a quest is already completed for its designated frequency period.
+ * Uses UTC day boundaries. Week starts on Monday.
  */
 export function isQuestCompletedForOccurrence(
   frequency: Frequency,
@@ -132,30 +159,31 @@ export function isQuestCompletedForOccurrence(
     return false;
   }
 
-  const nowDate = new Date(now);
-  const startOfToday = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
-  const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
-
   if (frequency === "ONCE") {
     return completions.length > 0;
   }
 
+  const nowUtcDay = toUtcDayKey(now);
+
   if (frequency === "DAILY" || frequency === "CUSTOM") {
     return completions.some((c) => {
-      const compTime = new Date(c.completedAt).getTime();
-      return compTime >= startOfToday && compTime <= endOfToday;
+      return toUtcDayKey(c.completedAt) === nowUtcDay;
     });
   }
 
   if (frequency === "WEEKLY") {
-    // Start of the week (Sunday or Monday, standard week range)
-    const dayOfWeek = nowDate.getDay();
-    const startOfWeek = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() - dayOfWeek).getTime();
-    const endOfWeek = startOfWeek + 7 * 24 * 60 * 60 * 1000 - 1;
+    // Compute the Monday-start week boundary in UTC using Date.UTC directly
+    // to avoid any local-timezone drift from the Date constructor.
+    const utcDay = now.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const mondayOffset = (utcDay + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
+    const weekStartMs =
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
+      mondayOffset * 86400000;
+    const weekEndMs = weekStartMs + 7 * 86400000 - 1;
 
     return completions.some((c) => {
       const compTime = new Date(c.completedAt).getTime();
-      return compTime >= startOfWeek && compTime <= endOfWeek;
+      return compTime >= weekStartMs && compTime <= weekEndMs;
     });
   }
 

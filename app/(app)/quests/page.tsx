@@ -1,4 +1,4 @@
-import { getOrCreateCurrentUser, type CurrentUserWithQuests, type QuestWithCompletions } from "@/lib/user";
+import { getCurrentUserWithQuests, type CurrentUserWithQuests, type QuestWithCompletions } from "@/lib/user";
 import { isQuestCompletedForOccurrence, type Difficulty, type Frequency } from "@/lib/gamification";
 import { QuestsBoard } from "@/components/quests/quests-board";
 import type { QuestData } from "@/components/quests/quest-item";
@@ -6,7 +6,7 @@ import type { QuestData } from "@/components/quests/quest-item";
 export const dynamic = "force-dynamic";
 
 export default async function QuestsPage() {
-  const user: CurrentUserWithQuests = await getOrCreateCurrentUser();
+  const user: CurrentUserWithQuests = await getCurrentUserWithQuests();
   const now = new Date();
 
   const formattedQuests: QuestData[] = user.quests.map((q: QuestWithCompletions) => {
