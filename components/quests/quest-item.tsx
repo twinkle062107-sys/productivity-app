@@ -21,6 +21,7 @@ export interface QuestData {
   category?: string | null;
   difficulty: Difficulty;
   frequency: Frequency;
+  reminderOn?: boolean;
   isCompletedToday: boolean;
   completionsCount?: number;
 }
@@ -115,6 +116,11 @@ export function QuestItem({
           {quest.frequency !== "DAILY" && (
             <span className="rounded-full bg-qd-ink/5 px-2 py-0.5 text-[10px] font-bold text-qd-muted">
               {quest.frequency.toLowerCase()}
+            </span>
+          )}
+          {quest.reminderOn && (
+            <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px]" title="Daily Reminder Active">
+              🔔
             </span>
           )}
         </div>

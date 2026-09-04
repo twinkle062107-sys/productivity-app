@@ -40,6 +40,7 @@ export function CreateQuestDialog({
   const [customCategory, setCustomCategory] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("MEDIUM");
   const [frequency, setFrequency] = useState<Frequency>("DAILY");
+  const [reminderOn, setReminderOn] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -60,7 +61,7 @@ export function CreateQuestDialog({
         category: finalCategory,
         difficulty,
         frequency,
-        reminderOn: true,
+        reminderOn,
       });
 
       if (!res.success || !res.data) {
@@ -83,6 +84,7 @@ export function CreateQuestDialog({
         setCustomCategory("");
         setDifficulty("MEDIUM");
         setFrequency("DAILY");
+        setReminderOn(true);
         setOpen(false);
         onQuestCreated?.(createdQuest);
       }
@@ -234,6 +236,29 @@ export function CreateQuestDialog({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Reminder Toggle */}
+          <div className="flex items-center justify-between rounded-2xl border border-white/80 bg-white/60 p-3">
+            <div>
+              <p className="text-xs font-black text-qd-ink">🔔 Reminder Notification</p>
+              <p className="text-[10px] text-qd-muted">Include quest in daily reminders</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReminderOn(!reminderOn)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                reminderOn ? "bg-qd-lavender" : "bg-slate-300"
+              }`}
+              role="switch"
+              aria-checked={reminderOn}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  reminderOn ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
           </div>
 
           {/* Submit */}

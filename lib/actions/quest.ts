@@ -784,3 +784,48 @@ export async function getQuestDetailAction(
   }
 }
 
+/**
+ * Toggles the reminder status of a single quest.
+ */
+export async function toggleQuestReminderAction(
+  questId: string
+): Promise<ActionResult<{ reminderOn: boolean }>> {
+  try {
+    const user = await requireUser();
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const quest = await prisma.quest.findFirst({
+      where: {
+        id: questId,
+        userId: user.id,
+        archivedAt: null,
+      },
+    });
+
+    if (!quest) {
+      return { success: false, error: "Quest not found." };
+    }
+
+    const updated = await prisma.quest.update({
+      where: { id: questId },
+      data: { reminderOn: !quest.reminderOn },
+    });
+
+    safeRevalidate("/dashboard");
+    safeRevalidate("/quests");
+    safeRevalidate(`/quests/${questId}`);
+
+    return {
+      success: true,
+      data: {
+        reminderOn: updated.reminderOn,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to toggle quest reminder:", error);
+    return { success: false, error: "Failed to toggle reminder." };
+  }
+}
+

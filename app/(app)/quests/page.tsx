@@ -23,6 +23,7 @@ export default async function QuestsPage() {
       category: q.category,
       difficulty: q.difficulty as Difficulty,
       frequency: q.frequency as Frequency,
+      reminderOn: q.reminderOn,
       isCompletedToday,
       completionsCount: q.completions.length,
     };

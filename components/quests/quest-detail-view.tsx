@@ -8,11 +8,14 @@ import { AchievementUnlockModal } from "@/components/achievements/achievement-un
 import { BossDefeatModal } from "@/components/boss/boss-defeat-modal";
 import {
   completeQuestAction,
+  toggleQuestReminderAction,
   type QuestDetailData,
   type QuestCompletionResponse,
   type BossDefeatedInfo,
   type UnlockedAchievementInfo,
 } from "@/lib/actions/quest";
+import { soundEngine } from "@/lib/notifications/sound";
+import { getStoredNotificationPrefs } from "@/lib/notifications/browser";
 import {
   XP_BY_DIFFICULTY,
   DIAMONDS_BY_DIFFICULTY,
@@ -35,6 +38,7 @@ export function QuestDetailView({
 }) {
   const [quest, setQuest] = useState<QuestDetailData>(initialQuest);
   const [isPending, startTransition] = useTransition();
+  const [isTogglingReminder, setIsTogglingReminder] = useState(false);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
   const [bossDefeatedModal, setBossDefeatedModal] = useState<BossDefeatedInfo | null>(null);
   const [achievementModal, setAchievementModal] = useState<UnlockedAchievementInfo | null>(null);
@@ -42,6 +46,26 @@ export function QuestDetailView({
   const categoryStyle = CATEGORY_COLORS[quest.category ?? "Focus"] ?? {
     bg: "bg-white/80",
     text: "text-qd-ink",
+  };
+
+  const handleToggleReminder = async () => {
+    if (isTogglingReminder) return;
+    setIsTogglingReminder(true);
+    const prevReminder = quest.reminderOn;
+    // Optimistic update
+    setQuest((prev) => ({ ...prev, reminderOn: !prevReminder }));
+
+    try {
+      const res = await toggleQuestReminderAction(quest.id);
+      if (!res.success || !res.data) {
+        // Rollback
+        setQuest((prev) => ({ ...prev, reminderOn: prevReminder }));
+      }
+    } catch {
+      setQuest((prev) => ({ ...prev, reminderOn: prevReminder }));
+    } finally {
+      setIsTogglingReminder(false);
+    }
   };
 
   const handleComplete = () => {
@@ -67,6 +91,11 @@ export function QuestDetailView({
             ...prev.completions,
           ],
         }));
+
+        const prefs = getStoredNotificationPrefs();
+        if (prefs.soundEnabled) {
+          soundEngine.playVictoryChime();
+        }
 
         if (res.data.bossDefeated) {
           setBossDefeatedModal(res.data.bossDefeated);
@@ -149,6 +178,19 @@ export function QuestDetailView({
           <span className="rounded-full bg-qd-ink/5 px-2.5 py-0.5 text-xs font-bold text-qd-muted">
             {quest.frequency.toLowerCase()}
           </span>
+          <button
+            type="button"
+            onClick={handleToggleReminder}
+            disabled={isTogglingReminder}
+            className={`rounded-full px-2.5 py-0.5 text-xs font-black transition active:scale-95 ${
+              quest.reminderOn
+                ? "bg-purple-100 text-purple-800 hover:bg-purple-200"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+            }`}
+            title="Click to toggle daily reminder notification for this quest"
+          >
+            {quest.reminderOn ? "🔔 Reminder On" : "🔕 Reminder Off"}
+          </button>
         </div>
 
         <h1 className="mt-3 text-2xl font-black text-qd-ink">{quest.title}</h1>

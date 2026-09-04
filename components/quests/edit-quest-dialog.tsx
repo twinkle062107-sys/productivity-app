@@ -274,6 +274,29 @@ export function EditQuestDialog({
             </div>
           </div>
 
+          {/* Reminder Toggle */}
+          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+            <div>
+              <p className="text-xs font-black text-qd-ink">🔔 Reminder Notification</p>
+              <p className="text-[10px] text-qd-muted">Include quest in daily reminders</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReminderOn(!reminderOn)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                reminderOn ? "bg-qd-lavender" : "bg-slate-300"
+              }`}
+              role="switch"
+              aria-checked={reminderOn}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  reminderOn ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
           {/* Action buttons */}
           <div className="pt-2 flex flex-col gap-2">
             <button
