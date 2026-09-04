@@ -10,11 +10,13 @@ import { QuestItem, type QuestData } from "@/components/quests/quest-item";
 import { BossCard } from "@/components/boss/boss-card";
 import { BossDefeatModal } from "@/components/boss/boss-defeat-modal";
 import { ChainsView } from "@/components/chains/chains-view";
+import { AchievementUnlockModal } from "@/components/achievements/achievement-unlock-modal";
 import { type BossData } from "@/lib/actions/boss";
 import { type QuestChainData } from "@/lib/actions/chain";
 import {
   type QuestCompletionResponse,
   type BossDefeatedInfo,
+  type UnlockedAchievementInfo,
 } from "@/lib/actions/quest";
 import { calculateLevel } from "@/lib/gamification";
 
@@ -49,6 +51,8 @@ export function DashboardClient({
   const [chains, setChains] = useState<QuestChainData[]>(initialChains);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
   const [bossDefeatedModal, setBossDefeatedModal] = useState<BossDefeatedInfo | null>(null);
+  const [unlockedAchievementModal, setUnlockedAchievementModal] =
+    useState<UnlockedAchievementInfo | null>(null);
 
   useEffect(() => {
     setQuests(initialQuests);
@@ -131,6 +135,11 @@ export function DashboardClient({
       );
     }
 
+    // Handle Achievement Unlocks
+    if (res.newAchievements && res.newAchievements.length > 0) {
+      setUnlockedAchievementModal(res.newAchievements[0]);
+    }
+
     setRewardToast(res);
     setTimeout(() => {
       setRewardToast((current) => (current?.questId === res.questId ? null : current));
@@ -164,6 +173,14 @@ export function DashboardClient({
 
   return (
     <>
+      {/* Achievement Unlock Celebration Modal */}
+      {unlockedAchievementModal && (
+        <AchievementUnlockModal
+          achievement={unlockedAchievementModal}
+          onClose={() => setUnlockedAchievementModal(null)}
+        />
+      )}
+
       {/* Boss Defeat Victory Fanfare */}
       {bossDefeatedModal && (
         <BossDefeatModal

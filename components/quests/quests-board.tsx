@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { CreateQuestDialog } from "@/components/quests/create-quest-dialog";
 import { QuestItem, type QuestData } from "@/components/quests/quest-item";
 import { BottomNav } from "@/components/layout/bottom-nav";
-import { type QuestCompletionResponse } from "@/lib/actions/quest";
+import { AchievementUnlockModal } from "@/components/achievements/achievement-unlock-modal";
+import {
+  type QuestCompletionResponse,
+  type UnlockedAchievementInfo,
+} from "@/lib/actions/quest";
 
 export function QuestsBoard({
   initialQuests,
@@ -16,6 +20,8 @@ export function QuestsBoard({
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
   const [filter, setFilter] = useState<"ALL" | "DAILY" | "WEEKLY" | "ONCE">("ALL");
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
+  const [unlockedAchievementModal, setUnlockedAchievementModal] =
+    useState<UnlockedAchievementInfo | null>(null);
 
   useEffect(() => {
     setQuests(initialQuests);
@@ -25,6 +31,11 @@ export function QuestsBoard({
     setQuests((prev) =>
       prev.map((q) => (q.id === res.questId ? { ...q, isCompletedToday: true } : q))
     );
+
+    if (res.newAchievements && res.newAchievements.length > 0) {
+      setUnlockedAchievementModal(res.newAchievements[0]);
+    }
+
     setRewardToast(res);
     setTimeout(() => {
       setRewardToast((current) => (current?.questId === res.questId ? null : current));
@@ -48,6 +59,14 @@ export function QuestsBoard({
 
   return (
     <>
+      {/* Achievement Unlock Celebration Modal */}
+      {unlockedAchievementModal && (
+        <AchievementUnlockModal
+          achievement={unlockedAchievementModal}
+          onClose={() => setUnlockedAchievementModal(null)}
+        />
+      )}
+
       {rewardToast && (
         <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="qd-glass flex items-center gap-3 rounded-full border-2 border-white bg-white/95 px-5 py-3 shadow-2xl backdrop-blur-xl">

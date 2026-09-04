@@ -1,16 +1,25 @@
+import { getUserAchievementsAction } from "@/lib/actions/achievements";
+import { AchievementsGallery } from "@/components/achievements/achievements-gallery";
 import { BottomNav } from "@/components/layout/bottom-nav";
 
-export default function AchievementsPage() {
-  return (
-    <>
-      <h1 className="text-2xl font-extrabold">Achievements</h1>
-      <p className="mt-2 text-qd-muted">Locked silhouettes vs unlocked badges will render here.</p>
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="qd-glass aspect-square rounded-[1.4rem] opacity-50" />
-        ))}
-      </div>
-      <BottomNav active="/achievements" />
-    </>
-  );
+export const dynamic = "force-dynamic";
+
+export default async function AchievementsPage() {
+  const res = await getUserAchievementsAction();
+
+  if (!res.success || !res.data) {
+    return (
+      <>
+        <h1 className="text-2xl font-extrabold text-qd-ink">Trophy Room</h1>
+        <div className="qd-glass mt-6 rounded-[2rem] p-8 text-center">
+          <p className="text-sm font-bold text-rose-500">
+            {res.error ?? "Unable to load achievements."}
+          </p>
+        </div>
+        <BottomNav active="/achievements" />
+      </>
+    );
+  }
+
+  return <AchievementsGallery initialData={res.data} />;
 }

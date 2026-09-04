@@ -20,6 +20,8 @@ import {
   type QuestDraft,
   type CompleteQuestInput,
 } from "@/lib/validations/quest";
+import { evaluateAndGrantAchievementsInTx } from "@/lib/actions/achievements";
+import type { AchievementDef } from "@/lib/gamification/achievements";
 
 export interface ActionResult<T = unknown> {
   success: boolean;
@@ -46,6 +48,14 @@ export interface ChainCompletedInfo {
   bonusDiamonds: number;
 }
 
+export interface UnlockedAchievementInfo {
+  key: string;
+  title: string;
+  description: string;
+  emoji: string;
+  diamondReward: number;
+}
+
 export interface QuestCompletionResponse {
   questId: string;
   xpAwarded: number;
@@ -57,6 +67,7 @@ export interface QuestCompletionResponse {
   bossDamage?: BossDamageInfo;
   bossDefeated?: BossDefeatedInfo;
   chainCompleted?: ChainCompletedInfo;
+  newAchievements?: UnlockedAchievementInfo[];
 }
 
 function safeRevalidate(path: string) {
@@ -340,6 +351,8 @@ export async function completeQuestAction(
     const newDiamonds = user.diamonds + totalDiamondsGained;
     const newLongestStreak = Math.max(user.longestStreak, streakResult.newStreak);
 
+    let newlyUnlockedAchievements: AchievementDef[] = [];
+
     await prisma.$transaction(async (tx) => {
       await tx.questCompletion.create({
         data: {
@@ -444,18 +457,47 @@ export async function completeQuestAction(
           },
         });
       }
+
+      // Check stats for achievement milestones
+      const totalCompletions = await tx.questCompletion.count({
+        where: { quest: { userId: user.id } },
+      });
+      const bossesDefeatedCount = await tx.boss.count({
+        where: { userId: user.id, defeatedAt: { not: null } },
+      });
+      const chainsCompletedCount = await tx.questChain.count({
+        where: { userId: user.id, completedAt: { not: null } },
+      });
+
+      newlyUnlockedAchievements = await evaluateAndGrantAchievementsInTx(
+        user.id,
+        {
+          totalCompletions,
+          streakCount: streakResult.newStreak,
+          level: levelResult.level,
+          bossesDefeated: bossesDefeatedCount,
+          chainsCompleted: chainsCompletedCount,
+        },
+        tx
+      );
     });
 
     safeRevalidate("/dashboard");
     safeRevalidate("/quests");
+    safeRevalidate("/achievements");
     safeRevalidate("/profile");
+
+    const bonusDiamondsFromAchievements = newlyUnlockedAchievements.reduce(
+      (acc, a) => acc + a.diamondReward,
+      0
+    );
 
     return {
       success: true,
       data: {
         questId: quest.id,
         xpAwarded: totalXpGained,
-        diamondsAwarded: totalDiamondsGained,
+        diamondsAwarded: totalDiamondsGained + bonusDiamondsFromAchievements,
         newStreak: streakResult.newStreak,
         newLevel: levelResult.level,
         newTotalXp,
@@ -463,6 +505,13 @@ export async function completeQuestAction(
         bossDamage,
         bossDefeated,
         chainCompleted,
+        newAchievements: newlyUnlockedAchievements.map((a) => ({
+          key: a.key,
+          title: a.title,
+          description: a.description,
+          emoji: a.emoji,
+          diamondReward: a.diamondReward,
+        })),
       },
     };
   } catch (error) {
