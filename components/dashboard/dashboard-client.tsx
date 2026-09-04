@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BlobMascot } from "@/components/brand/mascots";
 import { ProgressRing } from "@/components/brand/progress-ring";
@@ -34,6 +34,14 @@ export function DashboardClient({
   const [user, setUser] = useState<DashboardUserProps>(initialUser);
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
+
+  useEffect(() => {
+    setQuests(initialQuests);
+  }, [initialQuests]);
+
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
 
   const completedCount = quests.filter((q) => q.isCompletedToday).length;
   const totalCount = quests.length;
@@ -91,13 +99,14 @@ export function DashboardClient({
     }, 4000);
   };
 
-  const handleQuestCreated = () => {
-    // Re-fetch server components to pick up the new quest
+  const handleQuestCreated = (newQuest: QuestData) => {
+    setQuests((prev) => [newQuest, ...prev.filter((q) => q.id !== newQuest.id)]);
     router.refresh();
   };
 
   const handleQuestDeleted = (questId: string) => {
     setQuests((prev) => prev.filter((q) => q.id !== questId));
+    router.refresh();
   };
 
   // Day of week index for streak display (0 is Sunday, map to Monday-first 0..6)

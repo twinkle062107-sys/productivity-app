@@ -1,43 +1,20 @@
-"use client";
-
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { googleSignInAction } from "@/lib/actions/auth";
 
 export function GoogleSignInButton({
   callbackUrl,
 }: {
   callbackUrl?: string;
 }) {
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSignIn = async () => {
-    setIsPending(true);
-    setError(null);
-    try {
-      await signIn("google", {
-        redirectTo: callbackUrl || "/dashboard",
-      });
-      setIsPending(false);
-    } catch (e) {
-      // Sign-in redirects are expected; only unexpected errors surface here.
-      setError("Unable to sign in with Google. Please try again.");
-      setIsPending(false);
-    }
-  };
-
   return (
-    <div className="space-y-3">
-      {error && (
-        <div className="rounded-xl bg-rose-100 p-2.5 text-xs font-bold text-rose-700">
-          {error}
-        </div>
-      )}
+    <form
+      action={async () => {
+        "use server";
+        await googleSignInAction(callbackUrl);
+      }}
+    >
       <button
-        type="button"
-        onClick={handleSignIn}
-        disabled={isPending}
-        className="flex w-full items-center justify-center gap-3 rounded-full bg-white px-6 py-3.5 text-sm font-extrabold text-qd-ink shadow-lg ring-1 ring-black/5 transition hover:shadow-xl active:scale-[0.98] disabled:opacity-50"
+        type="submit"
+        className="flex w-full items-center justify-center gap-3 rounded-full bg-white px-6 py-3.5 text-sm font-extrabold text-qd-ink shadow-lg ring-1 ring-black/5 transition hover:shadow-xl active:scale-[0.98]"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
           <path
@@ -57,8 +34,9 @@ export function GoogleSignInButton({
             d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52Z"
           />
         </svg>
-        {isPending ? "Signing in..." : "Continue with Google"}
+        <span>Continue with Google</span>
       </button>
-    </div>
+    </form>
   );
 }
+

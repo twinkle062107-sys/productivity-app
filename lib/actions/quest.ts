@@ -57,12 +57,23 @@ async function requireUser() {
   return user;
 }
 
+export interface CreatedQuestResponse {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  difficulty: Difficulty;
+  frequency: Frequency;
+  isCompletedToday: boolean;
+  completionsCount: number;
+}
+
 /**
  * Creates a new productivity quest for the active user.
  */
 export async function createQuestAction(
   data: QuestDraft
-): Promise<ActionResult<{ id: string; title: string }>> {
+): Promise<ActionResult<CreatedQuestResponse>> {
   try {
     const parseResult = questDraftSchema.safeParse(data);
     if (!parseResult.success) {
@@ -95,7 +106,16 @@ export async function createQuestAction(
 
     return {
       success: true,
-      data: { id: quest.id, title: quest.title },
+      data: {
+        id: quest.id,
+        title: quest.title,
+        description: quest.description,
+        category: quest.category,
+        difficulty: quest.difficulty as Difficulty,
+        frequency: quest.frequency as Frequency,
+        isCompletedToday: false,
+        completionsCount: 0,
+      },
     };
   } catch (error) {
     console.error("Failed to create quest:", error);

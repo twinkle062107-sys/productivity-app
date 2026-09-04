@@ -26,10 +26,12 @@ const FREQUENCIES: Array<{ key: Frequency; label: string }> = [
   { key: "ONCE", label: "Once" },
 ];
 
+import { QuestData } from "@/components/quests/quest-item";
+
 export function CreateQuestDialog({
   onQuestCreated,
 }: {
-  onQuestCreated?: () => void;
+  onQuestCreated?: (quest: QuestData) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -61,9 +63,20 @@ export function CreateQuestDialog({
         reminderOn: true,
       });
 
-      if (!res.success) {
+      if (!res.success || !res.data) {
         setError(res.error ?? "Failed to create quest");
       } else {
+        const createdQuest: QuestData = {
+          id: res.data.id,
+          title: res.data.title,
+          description: res.data.description,
+          category: res.data.category,
+          difficulty: res.data.difficulty,
+          frequency: res.data.frequency,
+          isCompletedToday: res.data.isCompletedToday,
+          completionsCount: res.data.completionsCount,
+        };
+
         setTitle("");
         setDescription("");
         setCategory("Study");
@@ -71,7 +84,7 @@ export function CreateQuestDialog({
         setDifficulty("MEDIUM");
         setFrequency("DAILY");
         setOpen(false);
-        onQuestCreated?.();
+        onQuestCreated?.(createdQuest);
       }
     });
   };

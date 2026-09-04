@@ -1,36 +1,91 @@
 import NextAuth from "next-auth";
+import type { Provider } from "next-auth/providers";
 import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { ensureOnboardingQuests } from "@/lib/onboarding";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "database",
-  },
-  providers: [
+const providers: Provider[] = [
+  Credentials({
+    id: "credentials",
+    name: "Demo Account",
+    credentials: {
+      email: { label: "Email", type: "email" },
+      name: { label: "Name", type: "text" },
+    },
+    async authorize(credentials) {
+      const email = ((credentials?.email as string) || "hero@questdaily.app")
+        .trim()
+        .toLowerCase();
+      const name = ((credentials?.name as string) || "Hero").trim();
+
+      let user = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email,
+            name,
+          },
+        });
+        await ensureOnboardingQuests(user.id);
+      }
+
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+      };
+    },
+  }),
+];
+
+if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
+  providers.unshift(
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
-    }),
-  ],
+    })
+  );
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  debug: false,
+  adapter: PrismaAdapter(prisma),
+  secret: process.env.AUTH_SECRET || "dev-secret-key-for-questdaily-gamified-productivity",
+  session: {
+    strategy: "jwt",
+  },
+  pages: {
+    signIn: "/sign-in",
+    error: "/sign-in",
+  },
+  providers,
   trustHost: true,
   callbacks: {
-    async signIn({ user }) {
+    jwt({ token, user }) {
       if (user?.id) {
-        // Seed starter quests for new players on their first successful sign-in.
-        await ensureOnboardingQuests(user.id);
+        token.id = user.id;
       }
-      return true;
+      return token;
     },
-    session({ session, user }) {
-      // Ensure the session carries the stable DB user id so server code can
-      // associate quests/XP/streaks with the correct account.
-      if (session.user && user?.id) {
-        session.user.id = user.id;
+    session({ session, token }) {
+      if (session.user && token.id) {
+        session.user.id = token.id as string;
       }
       return session;
     },
   },
+  events: {
+    async createUser({ user }) {
+      if (user.id) {
+        await ensureOnboardingQuests(user.id);
+      }
+    },
+  },
 });
+
