@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   completeQuestAction,
   deleteQuestAction,
@@ -97,7 +98,10 @@ export function QuestItem({
           : "hover:border-qd-lavender/40 hover:shadow-lg"
       }`}
     >
-      <div className="flex flex-1 flex-col gap-1.5 min-w-0">
+      <Link
+        href={`/quests/${quest.id}`}
+        className="flex flex-1 flex-col gap-1.5 min-w-0 transition hover:opacity-85"
+      >
         <div className="flex flex-wrap items-center gap-1.5">
           <span
             className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${categoryStyle.bg} ${categoryStyle.text}`}
@@ -126,7 +130,7 @@ export function QuestItem({
         {error && (
           <p className="text-[11px] font-bold text-rose-500">{error}</p>
         )}
-      </div>
+      </Link>
 
       <div className="flex flex-shrink-0 items-center gap-1.5">
         {/* Delete button */}

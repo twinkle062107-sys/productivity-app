@@ -559,6 +559,7 @@ export async function deleteQuestAction(
 
     safeRevalidate("/dashboard");
     safeRevalidate("/quests");
+    safeRevalidate(`/quests/${questId}`);
 
     return { success: true, data: { id: questId } };
   } catch (error) {
@@ -569,3 +570,193 @@ export async function deleteQuestAction(
     };
   }
 }
+
+/**
+ * Updates an existing quest's details.
+ */
+export async function updateQuestAction(
+  questId: string,
+  data: QuestDraft
+): Promise<ActionResult<CreatedQuestResponse>> {
+  try {
+    const parseResult = questDraftSchema.safeParse(data);
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.issues[0]?.message ?? "Invalid quest data.",
+      };
+    }
+
+    const validated = parseResult.data;
+    const user = await requireUser();
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const quest = await prisma.quest.findFirst({
+      where: {
+        id: questId,
+        userId: user.id,
+        archivedAt: null,
+      },
+      include: {
+        completions: {
+          orderBy: { completedAt: "desc" },
+        },
+      },
+    });
+
+    if (!quest) {
+      return { success: false, error: "Quest not found." };
+    }
+
+    const updated = await prisma.quest.update({
+      where: { id: questId },
+      data: {
+        title: validated.title,
+        description: validated.description || null,
+        category: validated.category || "Focus",
+        difficulty: validated.difficulty as Difficulty,
+        frequency: validated.frequency as Frequency,
+        reminderOn: validated.reminderOn,
+      },
+    });
+
+    safeRevalidate("/dashboard");
+    safeRevalidate("/quests");
+    safeRevalidate(`/quests/${questId}`);
+
+    const now = new Date();
+    const isCompletedToday = isQuestCompletedForOccurrence(
+      updated.frequency as Frequency,
+      quest.completions,
+      now
+    );
+
+    return {
+      success: true,
+      data: {
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        category: updated.category,
+        difficulty: updated.difficulty as Difficulty,
+        frequency: updated.frequency as Frequency,
+        isCompletedToday,
+        completionsCount: quest.completions.length,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to update quest:", error);
+    return { success: false, error: "Failed to update quest." };
+  }
+}
+
+export interface QuestCompletionHistoryItem {
+  id: string;
+  completedAt: Date;
+  xpAwarded: number;
+  diamondsAwarded: number;
+}
+
+export interface QuestDetailData {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  difficulty: Difficulty;
+  frequency: Frequency;
+  reminderOn: boolean;
+  chainId: string | null;
+  chainTitle: string | null;
+  bossId: string | null;
+  bossTitle: string | null;
+  createdAt: Date;
+  isCompletedToday: boolean;
+  totalCompletions: number;
+  totalXpEarned: number;
+  totalDiamondsEarned: number;
+  completions: QuestCompletionHistoryItem[];
+}
+
+/**
+ * Fetches full details, lifetime statistics, and completion history for a single quest.
+ */
+export async function getQuestDetailAction(
+  questId: string
+): Promise<ActionResult<QuestDetailData>> {
+  try {
+    const user = await requireUser();
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const quest = await prisma.quest.findFirst({
+      where: {
+        id: questId,
+        userId: user.id,
+        archivedAt: null,
+      },
+      include: {
+        completions: {
+          orderBy: { completedAt: "desc" },
+        },
+        chain: true,
+        boss: true,
+      },
+    });
+
+    if (!quest) {
+      return { success: false, error: "Quest not found." };
+    }
+
+    const now = new Date();
+    const isCompletedToday = isQuestCompletedForOccurrence(
+      quest.frequency as Frequency,
+      quest.completions,
+      now
+    );
+
+    const totalCompletions = quest.completions.length;
+    const totalXpEarned = quest.completions.reduce(
+      (sum, c) => sum + (c.xpAwarded || 0),
+      0
+    );
+    const totalDiamondsEarned = quest.completions.reduce(
+      (sum, c) => sum + (c.diamondsAwarded || 0),
+      0
+    );
+
+    return {
+      success: true,
+      data: {
+        id: quest.id,
+        title: quest.title,
+        description: quest.description,
+        category: quest.category,
+        difficulty: quest.difficulty as Difficulty,
+        frequency: quest.frequency as Frequency,
+        reminderOn: quest.reminderOn,
+        chainId: quest.chainId,
+        chainTitle: quest.chain?.title ?? null,
+        bossId: quest.bossId,
+        bossTitle: quest.boss?.title ?? null,
+        createdAt: quest.createdAt,
+        isCompletedToday,
+        totalCompletions,
+        totalXpEarned,
+        totalDiamondsEarned,
+        completions: quest.completions.map((c) => ({
+          id: c.id,
+          completedAt: c.completedAt,
+          xpAwarded: c.xpAwarded,
+          diamondsAwarded: c.diamondsAwarded,
+        })),
+      },
+    };
+  } catch (error) {
+    console.error("Failed to load quest detail:", error);
+    return { success: false, error: "Unable to load quest details." };
+  }
+}
+
