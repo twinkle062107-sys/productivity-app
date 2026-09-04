@@ -3,6 +3,7 @@ import {
   calculateRewards,
   calculateLevel,
   calculateStreak,
+  calculateStreakWithFreeze,
   isQuestCompletedForOccurrence,
   toUtcDayKey,
   XP_BY_DIFFICULTY,
@@ -144,6 +145,38 @@ describe("Gamification Engine", () => {
       const result = calculateStreak("2026-08-31T18:00:00Z", 3, now);
       expect(result.newStreak).toBe(4);
       expect(result.streakIncreased).toBe(true);
+    });
+
+    it("Streak Freeze: preserves streak when 1 day is missed and freeze is available", () => {
+      const now = new Date("2026-09-02T12:00:00Z"); // active on Sep 2
+      const twoDaysAgo = new Date("2026-08-31T12:00:00Z"); // last active on Aug 31 (missed Sep 1)
+
+      const result = calculateStreakWithFreeze(twoDaysAgo, 5, 2, now);
+      expect(result.newStreak).toBe(6); // 5 + 1
+      expect(result.freezeUsed).toBe(true);
+      expect(result.remainingFreezes).toBe(1); // 2 - 1
+      expect(result.streakIncreased).toBe(true);
+      expect(result.isFirstToday).toBe(true);
+    });
+
+    it("Streak Freeze: resets streak if 1 day is missed but 0 freezes available", () => {
+      const now = new Date("2026-09-02T12:00:00Z");
+      const twoDaysAgo = new Date("2026-08-31T12:00:00Z");
+
+      const result = calculateStreakWithFreeze(twoDaysAgo, 5, 0, now);
+      expect(result.newStreak).toBe(1);
+      expect(result.freezeUsed).toBe(false);
+      expect(result.remainingFreezes).toBe(0);
+    });
+
+    it("Streak Freeze: resets streak if more than 1 day missed without wasting freeze", () => {
+      const now = new Date("2026-09-05T12:00:00Z");
+      const longAgo = new Date("2026-08-31T12:00:00Z"); // missed 4 days
+
+      const result = calculateStreakWithFreeze(longAgo, 10, 2, now);
+      expect(result.newStreak).toBe(1);
+      expect(result.freezeUsed).toBe(false);
+      expect(result.remainingFreezes).toBe(2); // freeze is kept for single day lapses
     });
   });
 

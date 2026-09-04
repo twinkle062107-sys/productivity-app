@@ -25,7 +25,7 @@ export default async function ProfilePage() {
           <p className="mt-1 text-xs font-bold text-qd-muted">{user.email}</p>
         )}
 
-        <div className="mt-6 grid w-full grid-cols-3 gap-3">
+        <div className="mt-6 grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-2xl bg-white/70 p-3 shadow-sm">
             <p className="text-xs font-bold text-qd-muted">Total XP</p>
             <p className="mt-1 text-lg font-black text-qd-ink">{user.currentXp}</p>
@@ -37,6 +37,10 @@ export default async function ProfilePage() {
           <div className="rounded-2xl bg-white/70 p-3 shadow-sm">
             <p className="text-xs font-bold text-qd-muted">Streak</p>
             <p className="mt-1 text-lg font-black text-rose-500">{user.streakCount} 🔥</p>
+          </div>
+          <div className="rounded-2xl bg-white/70 p-3 shadow-sm">
+            <p className="text-xs font-bold text-qd-muted">Freezes</p>
+            <p className="mt-1 text-lg font-black text-cyan-600">{user.streakFreezes ?? 0} / 3 ❄️</p>
           </div>
         </div>
 

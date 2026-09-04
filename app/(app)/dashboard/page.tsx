@@ -84,6 +84,7 @@ export default async function DashboardPage() {
     diamonds: user.diamonds,
     streakCount: user.streakCount,
     longestStreak: user.longestStreak,
+    streakFreezes: user.streakFreezes,
   };
 
   return (

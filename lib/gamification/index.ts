@@ -37,10 +37,18 @@ export interface LevelInfo {
   totalXp: number;
 }
 
+export const STREAK_FREEZE_COST = 20;
+export const MAX_STREAK_FREEZES = 3;
+
 export interface StreakResult {
   newStreak: number;
   streakIncreased: boolean;
   isFirstToday: boolean;
+}
+
+export interface StreakWithFreezeResult extends StreakResult {
+  freezeUsed: boolean;
+  remainingFreezes: number;
 }
 
 /**
@@ -103,19 +111,24 @@ export function calculateLevel(totalXp: number): LevelInfo {
 }
 
 /**
- * Calculates streak updates based on the user's last active date and current date.
- * Uses UTC day boundaries to avoid timezone issues around midnight.
+ * Calculates streak updates with streak freeze protection based on last active date.
+ * If 1 day was missed and a freeze is available, the freeze melts to protect the streak.
  */
-export function calculateStreak(
+export function calculateStreakWithFreeze(
   lastActiveDay: Date | string | null,
   currentStreak: number,
+  streakFreezes: number = 0,
   now: Date = new Date()
-): StreakResult {
+): StreakWithFreezeResult {
+  const safeFreezes = Math.max(0, streakFreezes);
+
   if (!lastActiveDay) {
     return {
       newStreak: 1,
       streakIncreased: true,
       isFirstToday: true,
+      freezeUsed: false,
+      remainingFreezes: safeFreezes,
     };
   }
 
@@ -127,6 +140,8 @@ export function calculateStreak(
       newStreak: Math.max(1, currentStreak),
       streakIncreased: false,
       isFirstToday: false,
+      freezeUsed: false,
+      remainingFreezes: safeFreezes,
     };
   }
 
@@ -135,14 +150,45 @@ export function calculateStreak(
       newStreak: Math.max(0, currentStreak) + 1,
       streakIncreased: true,
       isFirstToday: true,
+      freezeUsed: false,
+      remainingFreezes: safeFreezes,
     };
   }
 
-  // Broken streak (more than 1 day missed)
+  // If 1 day was missed (dayDiff === 2) and user has an active streak freeze:
+  if (dayDiff === 2 && safeFreezes > 0) {
+    return {
+      newStreak: Math.max(0, currentStreak) + 1,
+      streakIncreased: true,
+      isFirstToday: true,
+      freezeUsed: true,
+      remainingFreezes: safeFreezes - 1,
+    };
+  }
+
+  // Broken streak (more than 1 day missed or 0 freezes available)
   return {
     newStreak: 1,
     streakIncreased: true,
     isFirstToday: true,
+    freezeUsed: false,
+    remainingFreezes: safeFreezes,
+  };
+}
+
+/**
+ * Calculates streak updates without freezes (backwards compatibility).
+ */
+export function calculateStreak(
+  lastActiveDay: Date | string | null,
+  currentStreak: number,
+  now: Date = new Date()
+): StreakResult {
+  const result = calculateStreakWithFreeze(lastActiveDay, currentStreak, 0, now);
+  return {
+    newStreak: result.newStreak,
+    streakIncreased: result.streakIncreased,
+    isFirstToday: result.isFirstToday,
   };
 }
 

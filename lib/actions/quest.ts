@@ -7,6 +7,7 @@ import {
   calculateRewards,
   calculateLevel,
   calculateStreak,
+  calculateStreakWithFreeze,
   isQuestCompletedForOccurrence,
   calculateBossDamage,
   applyBossDamage,
@@ -64,6 +65,7 @@ export interface QuestCompletionResponse {
   newLevel: number;
   newTotalXp: number;
   leveledUp: boolean;
+  streakFreezeUsed?: boolean;
   bossDamage?: BossDamageInfo;
   bossDefeated?: BossDefeatedInfo;
   chainCompleted?: ChainCompletedInfo;
@@ -221,9 +223,14 @@ export async function completeQuestAction(
       };
     }
 
-    // Calculate base gamification changes
+    // Calculate base gamification changes (with streak freeze protection)
     const rewards = calculateRewards(quest.difficulty as Difficulty);
-    const streakResult = calculateStreak(user.lastActiveDay, user.streakCount, now);
+    const streakResult = calculateStreakWithFreeze(
+      user.lastActiveDay,
+      user.streakCount,
+      user.streakFreezes,
+      now
+    );
 
     let totalXpGained = rewards.xp;
     let totalDiamondsGained = rewards.diamonds;
@@ -373,9 +380,24 @@ export async function completeQuestAction(
           level: levelResult.level,
           streakCount: streakResult.newStreak,
           longestStreak: newLongestStreak,
+          streakFreezes: streakResult.remainingFreezes,
           lastActiveDay: now,
         },
       });
+
+      if (streakResult.freezeUsed) {
+        await tx.event.create({
+          data: {
+            userId: user.id,
+            type: "STREAK_FREEZE_USED",
+            payload: JSON.stringify({
+              savedStreak: streakResult.newStreak,
+              remainingFreezes: streakResult.remainingFreezes,
+              timestamp: now.toISOString(),
+            }),
+          },
+        });
+      }
 
       await tx.event.create({
         data: {
@@ -389,6 +411,7 @@ export async function completeQuestAction(
             diamondsEarned: rewards.diamonds,
             streak: streakResult.newStreak,
             newLevel: levelResult.level,
+            streakFreezeUsed: streakResult.freezeUsed,
           }),
         },
       });
@@ -502,6 +525,7 @@ export async function completeQuestAction(
         newLevel: levelResult.level,
         newTotalXp,
         leveledUp,
+        streakFreezeUsed: streakResult.freezeUsed,
         bossDamage,
         bossDefeated,
         chainCompleted,

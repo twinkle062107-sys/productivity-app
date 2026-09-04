@@ -11,6 +11,7 @@ import { BossCard } from "@/components/boss/boss-card";
 import { BossDefeatModal } from "@/components/boss/boss-defeat-modal";
 import { ChainsView } from "@/components/chains/chains-view";
 import { AchievementUnlockModal } from "@/components/achievements/achievement-unlock-modal";
+import { StreakFreezeDialog } from "@/components/dashboard/streak-freeze-dialog";
 import { type BossData } from "@/lib/actions/boss";
 import { type QuestChainData } from "@/lib/actions/chain";
 import {
@@ -27,6 +28,7 @@ export interface DashboardUserProps {
   diamonds: number;
   streakCount: number;
   longestStreak: number;
+  streakFreezes: number;
 }
 
 export interface DashboardClientProps {
@@ -50,6 +52,8 @@ export function DashboardClient({
   const [boss, setBoss] = useState<BossData | null>(initialBoss);
   const [chains, setChains] = useState<QuestChainData[]>(initialChains);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
+  const [freezeUsedToast, setFreezeUsedToast] = useState(false);
+  const [freezeDialogOpen, setFreezeDialogOpen] = useState(false);
   const [bossDefeatedModal, setBossDefeatedModal] = useState<BossDefeatedInfo | null>(null);
   const [unlockedAchievementModal, setUnlockedAchievementModal] =
     useState<UnlockedAchievementInfo | null>(null);
@@ -118,7 +122,18 @@ export function DashboardClient({
       diamonds: prev.diamonds + res.diamondsAwarded,
       streakCount: res.newStreak,
       longestStreak: Math.max(prev.longestStreak, res.newStreak),
+      streakFreezes: res.streakFreezeUsed
+        ? Math.max(0, (prev.streakFreezes ?? 0) - 1)
+        : prev.streakFreezes,
     }));
+
+    // Handle Streak Freeze saved notification
+    if (res.streakFreezeUsed) {
+      setFreezeUsedToast(true);
+      setTimeout(() => {
+        setFreezeUsedToast(false);
+      }, 5000);
+    }
 
     // Handle Boss Damage / Defeat
     if (res.bossDefeated) {
@@ -173,6 +188,21 @@ export function DashboardClient({
 
   return (
     <>
+      {/* Streak Freeze Dialog */}
+      <StreakFreezeDialog
+        isOpen={freezeDialogOpen}
+        onClose={() => setFreezeDialogOpen(false)}
+        diamonds={user.diamonds}
+        streakFreezes={user.streakFreezes ?? 0}
+        onFreezePurchased={(updated) =>
+          setUser((prev) => ({
+            ...prev,
+            diamonds: updated.diamonds,
+            streakFreezes: updated.streakFreezes,
+          }))
+        }
+      />
+
       {/* Achievement Unlock Celebration Modal */}
       {unlockedAchievementModal && (
         <AchievementUnlockModal
@@ -187,6 +217,23 @@ export function DashboardClient({
           info={bossDefeatedModal}
           onClose={() => setBossDefeatedModal(null)}
         />
+      )}
+
+      {/* Streak Freeze Saved Celebration Banner */}
+      {freezeUsedToast && (
+        <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3 rounded-full border-2 border-cyan-300 bg-slate-900/95 px-5 py-3 text-white shadow-2xl backdrop-blur-xl">
+            <span className="text-2xl animate-spin">❄️</span>
+            <div>
+              <p className="text-xs font-black text-cyan-300">
+                Streak Freeze Activated!
+              </p>
+              <p className="text-[11px] font-bold text-slate-200">
+                A shield melted to protect your {user.streakCount}-day streak! 🛡️
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Reward Celebration Notification */}
@@ -233,21 +280,22 @@ export function DashboardClient({
       </header>
 
       {/* Quick Action Tiles */}
-      <section className="mt-4 grid grid-cols-4 gap-3">
+      <section className="mt-4 grid grid-cols-5 gap-2">
         {[
-          { name: "Chains", tint: "bg-[#ece7ff]", emoji: "🔗", target: "chains-section" },
-          { name: "Bosses", tint: "bg-[#ffe8ef]", emoji: "🐉", target: "boss-section" },
-          { name: "Focus", tint: "bg-[#e7fff8]", emoji: "🎯", target: "focus-section" },
-          { name: "Quests", tint: "bg-[#fff4d6]", emoji: "⚔️", target: "quests-section" },
+          { name: "Chains", tint: "bg-[#ece7ff]", emoji: "🔗", onClick: () => scrollToSection("chains-section") },
+          { name: "Bosses", tint: "bg-[#ffe8ef]", emoji: "🐉", onClick: () => scrollToSection("boss-section") },
+          { name: "Focus", tint: "bg-[#e7fff8]", emoji: "🎯", onClick: () => scrollToSection("focus-section") },
+          { name: "Quests", tint: "bg-[#fff4d6]", emoji: "⚔️", onClick: () => scrollToSection("quests-section") },
+          { name: "Freeze", tint: "bg-[#e0f7fa]", emoji: "❄️", onClick: () => setFreezeDialogOpen(true) },
         ].map((action) => (
           <button
             key={action.name}
             type="button"
-            onClick={() => scrollToSection(action.target)}
-            className="flex flex-col items-center gap-1.5 opacity-90 transition hover:opacity-100 hover:scale-105 active:scale-95"
+            onClick={action.onClick}
+            className="flex flex-col items-center gap-1 opacity-90 transition hover:opacity-100 hover:scale-105 active:scale-95"
           >
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl text-xl shadow-sm ${action.tint}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-2xl text-lg shadow-sm ${action.tint}`}
             >
               {action.emoji}
             </div>
@@ -274,8 +322,8 @@ export function DashboardClient({
             <p className="text-sm text-qd-muted">
               {focusQuest
                 ? focusQuest.isCompletedToday
-                  ? "Great job! Completed for today"
-                  : `Earn +${focusQuest.difficulty} rewards`
+                ? "Great job! Completed for today"
+                : `Earn +${focusQuest.difficulty} rewards`
                 : "Add a new quest below to start playing"}
             </p>
             <p className="mt-3 text-xs font-bold text-qd-lavender">
@@ -297,9 +345,19 @@ export function DashboardClient({
                 : "Complete a quest today to start your streak!"}
             </p>
           </div>
-          <span className="rounded-full bg-[#fff4d6] px-3 py-1 text-sm font-extrabold text-amber-900 shadow-sm">
-            {user.streakCount} 🔥
-          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setFreezeDialogOpen(true)}
+              className="flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-black text-cyan-900 border border-cyan-200 shadow-sm transition hover:bg-cyan-200 active:scale-95"
+              title="Equip or view Streak Freezes"
+            >
+              ❄️ {user.streakFreezes ?? 0}/3
+            </button>
+            <span className="rounded-full bg-[#fff4d6] px-3 py-1 text-sm font-extrabold text-amber-900 shadow-sm">
+              {user.streakCount} 🔥
+            </span>
+          </div>
         </div>
         <div className="mt-4 flex justify-between">
           {WEEK_DAYS.map((day, i) => {
