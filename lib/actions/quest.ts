@@ -8,6 +8,9 @@ import {
   calculateLevel,
   calculateStreak,
   isQuestCompletedForOccurrence,
+  calculateBossDamage,
+  applyBossDamage,
+  calculateBossRewards,
   type Difficulty,
   type Frequency,
 } from "@/lib/gamification";
@@ -24,6 +27,25 @@ export interface ActionResult<T = unknown> {
   error?: string;
 }
 
+export interface BossDamageInfo {
+  damage: number;
+  remainingHp: number;
+  maxHp: number;
+  bossTitle: string;
+}
+
+export interface BossDefeatedInfo {
+  bossTitle: string;
+  bonusXp: number;
+  bonusDiamonds: number;
+}
+
+export interface ChainCompletedInfo {
+  chainTitle: string;
+  bonusXp: number;
+  bonusDiamonds: number;
+}
+
 export interface QuestCompletionResponse {
   questId: string;
   xpAwarded: number;
@@ -32,6 +54,9 @@ export interface QuestCompletionResponse {
   newLevel: number;
   newTotalXp: number;
   leveledUp: boolean;
+  bossDamage?: BossDamageInfo;
+  bossDefeated?: BossDefeatedInfo;
+  chainCompleted?: ChainCompletedInfo;
 }
 
 function safeRevalidate(path: string) {
@@ -127,7 +152,7 @@ export async function createQuestAction(
 }
 
 /**
- * Marks an active quest as completed, awarding XP, diamonds, updating streaks, and logging events.
+ * Marks an active quest as completed, awarding XP, diamonds, updating streaks, damaging active bosses, and logging events.
  */
 export async function completeQuestAction(
   input: CompleteQuestInput
@@ -157,6 +182,7 @@ export async function completeQuestAction(
         completions: {
           orderBy: { completedAt: "desc" },
         },
+        chain: true,
       },
     });
 
@@ -184,21 +210,138 @@ export async function completeQuestAction(
       };
     }
 
-    // Calculate gamification changes
+    // Calculate base gamification changes
     const rewards = calculateRewards(quest.difficulty as Difficulty);
     const streakResult = calculateStreak(user.lastActiveDay, user.streakCount, now);
-    const newTotalXp = user.currentXp + rewards.xp;
+
+    let totalXpGained = rewards.xp;
+    let totalDiamondsGained = rewards.diamonds;
+
+    // Boss damage calculation
+    const activeBoss = await prisma.boss.findFirst({
+      where: {
+        userId: user.id,
+        defeatedAt: null,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    let bossDamage: BossDamageInfo | undefined;
+    let bossDefeated: BossDefeatedInfo | undefined;
+    let bossUpdateOp = null;
+    let bossDefeatEventOp = null;
+
+    if (activeBoss) {
+      const dmg = calculateBossDamage(quest.difficulty as Difficulty);
+      const bossResult = applyBossDamage(activeBoss.currentHp, dmg);
+
+      if (bossResult.isDefeated) {
+        const bossLoot = calculateBossRewards(activeBoss.maxHp);
+        totalXpGained += bossLoot.xp;
+        totalDiamondsGained += bossLoot.diamonds;
+
+        bossDefeated = {
+          bossTitle: activeBoss.title,
+          bonusXp: bossLoot.xp,
+          bonusDiamonds: bossLoot.diamonds,
+        };
+
+        bossUpdateOp = prisma.boss.update({
+          where: { id: activeBoss.id },
+          data: {
+            currentHp: 0,
+            defeatedAt: now,
+          },
+        });
+
+        bossDefeatEventOp = prisma.event.create({
+          data: {
+            userId: user.id,
+            type: "BOSS_DEFEATED",
+            payload: JSON.stringify({
+              bossId: activeBoss.id,
+              title: activeBoss.title,
+              maxHp: activeBoss.maxHp,
+              bonusXp: bossLoot.xp,
+              bonusDiamonds: bossLoot.diamonds,
+            }),
+          },
+        });
+      } else {
+        bossDamage = {
+          damage: dmg,
+          remainingHp: bossResult.remainingHp,
+          maxHp: activeBoss.maxHp,
+          bossTitle: activeBoss.title,
+        };
+
+        bossUpdateOp = prisma.boss.update({
+          where: { id: activeBoss.id },
+          data: {
+            currentHp: bossResult.remainingHp,
+          },
+        });
+      }
+    }
+
+    // Quest Chain progression calculation
+    let chainCompleted: ChainCompletedInfo | undefined;
+    let chainUpdateOp = null;
+    let chainEventOp = null;
+
+    if (quest.chainId && quest.chain && !quest.chain.completedAt) {
+      const siblingQuests = await prisma.quest.findMany({
+        where: {
+          chainId: quest.chainId,
+          archivedAt: null,
+        },
+        include: { completions: true },
+      });
+
+      const otherUncompleted = siblingQuests.filter(
+        (q) => q.id !== quest.id && q.completions.length === 0
+      );
+
+      if (otherUncompleted.length === 0) {
+        const chainBonusXp = 100;
+        const chainBonusDiamonds = 10;
+        totalXpGained += chainBonusXp;
+        totalDiamondsGained += chainBonusDiamonds;
+
+        chainCompleted = {
+          chainTitle: quest.chain.title,
+          bonusXp: chainBonusXp,
+          bonusDiamonds: chainBonusDiamonds,
+        };
+
+        chainUpdateOp = prisma.questChain.update({
+          where: { id: quest.chainId },
+          data: { completedAt: now },
+        });
+
+        chainEventOp = prisma.event.create({
+          data: {
+            userId: user.id,
+            type: "CHAIN_COMPLETED",
+            payload: JSON.stringify({
+              chainId: quest.chainId,
+              title: quest.chain.title,
+              bonusXp: chainBonusXp,
+              bonusDiamonds: chainBonusDiamonds,
+            }),
+          },
+        });
+      }
+    }
+
+    const newTotalXp = user.currentXp + totalXpGained;
     const levelResult = calculateLevel(newTotalXp);
     const leveledUp = levelResult.level > user.level;
-    const newDiamonds = user.diamonds + rewards.diamonds;
+    const newDiamonds = user.diamonds + totalDiamondsGained;
     const newLongestStreak = Math.max(user.longestStreak, streakResult.newStreak);
 
-    // Execute atomic transaction for state integrity.
-    // The completion record creation + user update happen together,
-    // so a duplicate request hitting between the check and write will
-    // either see the old state (and re-check) or the new state.
-    await prisma.$transaction([
-      prisma.questCompletion.create({
+    await prisma.$transaction(async (tx) => {
+      await tx.questCompletion.create({
         data: {
           questId: quest.id,
           xpAwarded: rewards.xp,
@@ -206,20 +349,22 @@ export async function completeQuestAction(
           diamondsAwarded: rewards.diamonds,
           completedAt: now,
         },
-      }),
-      prisma.user.update({
+      });
+
+      await tx.user.update({
         where: { id: user.id },
         data: {
           currentXp: newTotalXp,
-          points: { increment: rewards.xp },
+          points: { increment: totalXpGained },
           diamonds: newDiamonds,
           level: levelResult.level,
           streakCount: streakResult.newStreak,
           longestStreak: newLongestStreak,
           lastActiveDay: now,
         },
-      }),
-      prisma.event.create({
+      });
+
+      await tx.event.create({
         data: {
           userId: user.id,
           type: "QUEST_COMPLETED",
@@ -233,23 +378,73 @@ export async function completeQuestAction(
             newLevel: levelResult.level,
           }),
         },
-      }),
-      ...(leveledUp
-        ? [
-            prisma.event.create({
-              data: {
-                userId: user.id,
-                type: "LEVEL_UP",
-                payload: JSON.stringify({
-                  previousLevel: user.level,
-                  newLevel: levelResult.level,
-                  totalXp: newTotalXp,
-                }),
-              },
+      });
+
+      if (leveledUp) {
+        await tx.event.create({
+          data: {
+            userId: user.id,
+            type: "LEVEL_UP",
+            payload: JSON.stringify({
+              previousLevel: user.level,
+              newLevel: levelResult.level,
+              totalXp: newTotalXp,
             }),
-          ]
-        : []),
-    ]);
+          },
+        });
+      }
+
+      if (activeBoss) {
+        if (bossDefeated) {
+          await tx.boss.update({
+            where: { id: activeBoss.id },
+            data: {
+              currentHp: 0,
+              defeatedAt: now,
+            },
+          });
+          await tx.event.create({
+            data: {
+              userId: user.id,
+              type: "BOSS_DEFEATED",
+              payload: JSON.stringify({
+                bossId: activeBoss.id,
+                title: activeBoss.title,
+                maxHp: activeBoss.maxHp,
+                bonusXp: bossDefeated.bonusXp,
+                bonusDiamonds: bossDefeated.bonusDiamonds,
+              }),
+            },
+          });
+        } else if (bossDamage) {
+          await tx.boss.update({
+            where: { id: activeBoss.id },
+            data: {
+              currentHp: bossDamage.remainingHp,
+            },
+          });
+        }
+      }
+
+      if (chainCompleted && quest.chainId) {
+        await tx.questChain.update({
+          where: { id: quest.chainId },
+          data: { completedAt: now },
+        });
+        await tx.event.create({
+          data: {
+            userId: user.id,
+            type: "CHAIN_COMPLETED",
+            payload: JSON.stringify({
+              chainId: quest.chainId,
+              title: chainCompleted.chainTitle,
+              bonusXp: chainCompleted.bonusXp,
+              bonusDiamonds: chainCompleted.bonusDiamonds,
+            }),
+          },
+        });
+      }
+    });
 
     safeRevalidate("/dashboard");
     safeRevalidate("/quests");
@@ -259,12 +454,15 @@ export async function completeQuestAction(
       success: true,
       data: {
         questId: quest.id,
-        xpAwarded: rewards.xp,
-        diamondsAwarded: rewards.diamonds,
+        xpAwarded: totalXpGained,
+        diamondsAwarded: totalDiamondsGained,
         newStreak: streakResult.newStreak,
         newLevel: levelResult.level,
         newTotalXp,
         leveledUp,
+        bossDamage,
+        bossDefeated,
+        chainCompleted,
       },
     };
   } catch (error) {

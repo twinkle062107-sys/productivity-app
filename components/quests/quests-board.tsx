@@ -15,6 +15,7 @@ export function QuestsBoard({
   const router = useRouter();
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
   const [filter, setFilter] = useState<"ALL" | "DAILY" | "WEEKLY" | "ONCE">("ALL");
+  const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
 
   useEffect(() => {
     setQuests(initialQuests);
@@ -24,6 +25,10 @@ export function QuestsBoard({
     setQuests((prev) =>
       prev.map((q) => (q.id === res.questId ? { ...q, isCompletedToday: true } : q))
     );
+    setRewardToast(res);
+    setTimeout(() => {
+      setRewardToast((current) => (current?.questId === res.questId ? null : current));
+    }, 4000);
   };
 
   const handleQuestCreated = (newQuest: QuestData) => {
@@ -43,6 +48,24 @@ export function QuestsBoard({
 
   return (
     <>
+      {rewardToast && (
+        <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="qd-glass flex items-center gap-3 rounded-full border-2 border-white bg-white/95 px-5 py-3 shadow-2xl backdrop-blur-xl">
+            <span className="text-2xl animate-bounce">🎉</span>
+            <div>
+              <p className="text-xs font-black text-qd-ink">
+                {rewardToast.leveledUp
+                  ? `Level Up! Reached Level ${rewardToast.newLevel}!`
+                  : "Quest Completed!"}
+              </p>
+              <p className="text-[11px] font-bold text-qd-lavender">
+                +{rewardToast.xpAwarded} XP · +{rewardToast.diamondsAwarded} 💎 · {rewardToast.newStreak} 🔥 Streak
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-qd-ink">Quest Board</h1>

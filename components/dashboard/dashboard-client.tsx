@@ -7,7 +7,15 @@ import { ProgressRing } from "@/components/brand/progress-ring";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { CreateQuestDialog } from "@/components/quests/create-quest-dialog";
 import { QuestItem, type QuestData } from "@/components/quests/quest-item";
-import { type QuestCompletionResponse } from "@/lib/actions/quest";
+import { BossCard } from "@/components/boss/boss-card";
+import { BossDefeatModal } from "@/components/boss/boss-defeat-modal";
+import { ChainsView } from "@/components/chains/chains-view";
+import { type BossData } from "@/lib/actions/boss";
+import { type QuestChainData } from "@/lib/actions/chain";
+import {
+  type QuestCompletionResponse,
+  type BossDefeatedInfo,
+} from "@/lib/actions/quest";
 import { calculateLevel } from "@/lib/gamification";
 
 export interface DashboardUserProps {
@@ -22,6 +30,8 @@ export interface DashboardUserProps {
 export interface DashboardClientProps {
   initialUser: DashboardUserProps;
   initialQuests: QuestData[];
+  initialBoss?: BossData | null;
+  initialChains?: QuestChainData[];
 }
 
 const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -29,11 +39,16 @@ const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 export function DashboardClient({
   initialUser,
   initialQuests,
+  initialBoss = null,
+  initialChains = [],
 }: DashboardClientProps) {
   const router = useRouter();
   const [user, setUser] = useState<DashboardUserProps>(initialUser);
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
+  const [boss, setBoss] = useState<BossData | null>(initialBoss);
+  const [chains, setChains] = useState<QuestChainData[]>(initialChains);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
+  const [bossDefeatedModal, setBossDefeatedModal] = useState<BossDefeatedInfo | null>(null);
 
   useEffect(() => {
     setQuests(initialQuests);
@@ -42,6 +57,14 @@ export function DashboardClient({
   useEffect(() => {
     setUser(initialUser);
   }, [initialUser]);
+
+  useEffect(() => {
+    setBoss(initialBoss);
+  }, [initialBoss]);
+
+  useEffect(() => {
+    setChains(initialChains);
+  }, [initialChains]);
 
   const completedCount = quests.filter((q) => q.isCompletedToday).length;
   const totalCount = quests.length;
@@ -93,6 +116,21 @@ export function DashboardClient({
       longestStreak: Math.max(prev.longestStreak, res.newStreak),
     }));
 
+    // Handle Boss Damage / Defeat
+    if (res.bossDefeated) {
+      setBoss(null);
+      setBossDefeatedModal(res.bossDefeated);
+    } else if (res.bossDamage) {
+      setBoss((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentHp: res.bossDamage!.remainingHp,
+            }
+          : null
+      );
+    }
+
     setRewardToast(res);
     setTimeout(() => {
       setRewardToast((current) => (current?.questId === res.questId ? null : current));
@@ -109,11 +147,31 @@ export function DashboardClient({
     router.refresh();
   };
 
+  const handleBossCreated = (newBoss: BossData) => {
+    setBoss(newBoss);
+    router.refresh();
+  };
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   // Day of week index for streak display (0 is Sunday, map to Monday-first 0..6)
   const todayIndex = (new Date().getDay() + 6) % 7;
 
   return (
     <>
+      {/* Boss Defeat Victory Fanfare */}
+      {bossDefeatedModal && (
+        <BossDefeatModal
+          info={bossDefeatedModal}
+          onClose={() => setBossDefeatedModal(null)}
+        />
+      )}
+
       {/* Reward Celebration Notification */}
       {rewardToast && (
         <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -121,12 +179,15 @@ export function DashboardClient({
             <span className="text-2xl animate-bounce">🎉</span>
             <div>
               <p className="text-xs font-black text-qd-ink">
-                {rewardToast.leveledUp
+                {rewardToast.chainCompleted
+                  ? `Chain Complete: ${rewardToast.chainCompleted.chainTitle}!`
+                  : rewardToast.leveledUp
                   ? `Level Up! Reached Level ${rewardToast.newLevel}!`
                   : "Quest Completed!"}
               </p>
               <p className="text-[11px] font-bold text-qd-lavender">
-                +{rewardToast.xpAwarded} XP · +{rewardToast.diamondsAwarded} 💎 · {rewardToast.newStreak} 🔥 Streak
+                +{rewardToast.xpAwarded} XP · +{rewardToast.diamondsAwarded} 💎
+                {rewardToast.bossDamage && ` · -${rewardToast.bossDamage.damage} HP to Boss 🐉`}
               </p>
             </div>
           </div>
@@ -154,8 +215,37 @@ export function DashboardClient({
         </div>
       </header>
 
+      {/* Quick Action Tiles */}
+      <section className="mt-4 grid grid-cols-4 gap-3">
+        {[
+          { name: "Chains", tint: "bg-[#ece7ff]", emoji: "🔗", target: "chains-section" },
+          { name: "Bosses", tint: "bg-[#ffe8ef]", emoji: "🐉", target: "boss-section" },
+          { name: "Focus", tint: "bg-[#e7fff8]", emoji: "🎯", target: "focus-section" },
+          { name: "Quests", tint: "bg-[#fff4d6]", emoji: "⚔️", target: "quests-section" },
+        ].map((action) => (
+          <button
+            key={action.name}
+            type="button"
+            onClick={() => scrollToSection(action.target)}
+            className="flex flex-col items-center gap-1.5 opacity-90 transition hover:opacity-100 hover:scale-105 active:scale-95"
+          >
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl text-xl shadow-sm ${action.tint}`}
+            >
+              {action.emoji}
+            </div>
+            <p className="text-[10px] font-bold text-qd-muted">{action.name}</p>
+          </button>
+        ))}
+      </section>
+
+      {/* Boss Encounter Widget */}
+      <section id="boss-section" className="mt-4">
+        <BossCard boss={boss} onBossCreated={handleBossCreated} />
+      </section>
+
       {/* Today's Focus Card */}
-      <section className="qd-glass mt-6 rounded-[2rem] p-5">
+      <section id="focus-section" className="qd-glass mt-4 rounded-[2rem] p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold uppercase tracking-wide text-qd-muted">
@@ -223,11 +313,11 @@ export function DashboardClient({
       </section>
 
       {/* Active Quests List */}
-      <section className="mt-5 space-y-3">
+      <section id="quests-section" className="mt-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-extrabold text-qd-ink">Active Quests</h3>
-            <p className="text-xs text-qd-muted">Tap checkmark to earn XP & gems</p>
+            <p className="text-xs text-qd-muted">Tap checkmark to earn XP & attack bosses</p>
           </div>
           <CreateQuestDialog onQuestCreated={handleQuestCreated} />
         </div>
@@ -250,6 +340,14 @@ export function DashboardClient({
             ))}
           </div>
         )}
+      </section>
+
+      {/* Quest Chains Section */}
+      <section id="chains-section" className="mt-6">
+        <ChainsView
+          chains={chains}
+          onQuestCompleted={handleQuestCompleted}
+        />
       </section>
 
       {/* Categories Progress */}
@@ -278,25 +376,6 @@ export function DashboardClient({
           </div>
         </section>
       )}
-
-      {/* Quick Action Tiles */}
-      <section className="mt-4 grid grid-cols-4 gap-3">
-        {[
-          { name: "Chains", tint: "bg-[#ece7ff]", emoji: "🔗" },
-          { name: "Bosses", tint: "bg-[#ffe8ef]", emoji: "🐉" },
-          { name: "Freeze", tint: "bg-[#e7fff8]", emoji: "❄" },
-          { name: "Season", tint: "bg-[#fff4d6]", emoji: "✦" },
-        ].map((action) => (
-          <div key={action.name} className="flex flex-col items-center gap-1.5 opacity-80 transition hover:opacity-100">
-            <div
-              className={`flex h-13 w-13 items-center justify-center rounded-2xl text-xl shadow-sm ${action.tint}`}
-            >
-              {action.emoji}
-            </div>
-            <p className="text-[10px] font-bold text-qd-muted">{action.name}</p>
-          </div>
-        ))}
-      </section>
 
       <BottomNav active="/dashboard" />
     </>

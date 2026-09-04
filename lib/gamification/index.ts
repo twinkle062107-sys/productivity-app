@@ -189,3 +189,79 @@ export function isQuestCompletedForOccurrence(
 
   return false;
 }
+
+/**
+ * Calculates boss damage dealt when completing a quest of a given difficulty.
+ */
+export function calculateBossDamage(difficulty: Difficulty): number {
+  return XP_BY_DIFFICULTY[difficulty] ?? XP_BY_DIFFICULTY.MEDIUM;
+}
+
+/**
+ * Applies damage to a Boss and determines if the Boss is defeated.
+ */
+export function applyBossDamage(
+  currentHp: number,
+  damage: number
+): { remainingHp: number; isDefeated: boolean } {
+  const safeDamage = Math.max(0, damage);
+  const remainingHp = Math.max(0, currentHp - safeDamage);
+  return {
+    remainingHp,
+    isDefeated: remainingHp === 0,
+  };
+}
+
+/**
+ * Calculates bonus victory loot when a Boss is defeated based on its max HP.
+ */
+export function calculateBossRewards(maxHp: number): RewardResult {
+  const safeHp = Math.max(10, maxHp);
+  const xp = safeHp;
+  const diamonds = Math.max(5, Math.floor(safeHp / 20));
+  return { xp, diamonds };
+}
+
+export interface ChainProgressResult {
+  totalSteps: number;
+  completedSteps: number;
+  currentChapterIndex: number;
+  progressPct: number;
+  isCompleted: boolean;
+}
+
+/**
+ * Calculates the progress of a multi-chapter Quest Chain.
+ * Quests in the chain are ordered by chapterIndex (1-indexed or 0-indexed).
+ */
+export function calculateChainProgress(
+  quests: Array<{ completions?: Array<{ completedAt: Date | string }> }>
+): ChainProgressResult {
+  const totalSteps = quests.length;
+  if (totalSteps === 0) {
+    return {
+      totalSteps: 0,
+      completedSteps: 0,
+      currentChapterIndex: 0,
+      progressPct: 0,
+      isCompleted: false,
+    };
+  }
+
+  const completedSteps = quests.filter(
+    (q) => q.completions && q.completions.length > 0
+  ).length;
+
+  const progressPct = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
+  const isCompleted = completedSteps >= totalSteps;
+  const currentChapterIndex = Math.min(completedSteps, totalSteps - 1);
+
+  return {
+    totalSteps,
+    completedSteps,
+    currentChapterIndex,
+    progressPct,
+    isCompleted,
+  };
+}
+

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import type { User, Quest, QuestCompletion } from "@prisma/client";
+import type { User, Quest, QuestCompletion, Boss, QuestChain } from "@prisma/client";
 
 export { ensureOnboardingQuests } from "@/lib/onboarding";
 
@@ -13,6 +13,14 @@ export type CurrentUser = User;
 
 export type CurrentUserWithQuests = User & {
   quests: QuestWithCompletions[];
+};
+
+export type CurrentUserFullData = User & {
+  quests: QuestWithCompletions[];
+  bosses: Boss[];
+  chains: (QuestChain & {
+    quests: QuestWithCompletions[];
+  })[];
 };
 
 /**
@@ -71,3 +79,52 @@ export async function getCurrentUserWithQuests(): Promise<CurrentUserWithQuests>
 
   return user;
 }
+
+/**
+ * Returns the authenticated user with quests, active/recent bosses, and chains.
+ */
+export async function getCurrentUserFullData(): Promise<CurrentUserFullData> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/sign-in");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: {
+      quests: {
+        where: { archivedAt: null },
+        include: {
+          completions: {
+            orderBy: { completedAt: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      bosses: {
+        orderBy: { createdAt: "desc" },
+      },
+      chains: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          quests: {
+            where: { archivedAt: null },
+            orderBy: { chapterIndex: "asc" },
+            include: {
+              completions: {
+                orderBy: { completedAt: "desc" },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  return user;
+}
+

@@ -7,6 +7,10 @@ import {
   toUtcDayKey,
   XP_BY_DIFFICULTY,
   DIAMONDS_BY_DIFFICULTY,
+  calculateBossDamage,
+  applyBossDamage,
+  calculateBossRewards,
+  calculateChainProgress,
 } from "./index";
 
 describe("Gamification Engine", () => {
@@ -281,4 +285,79 @@ describe("Gamification Engine", () => {
       ).toBe(false);
     });
   });
+
+  describe("Boss Battles Engine", () => {
+    it("calculates boss damage from quest difficulty", () => {
+      expect(calculateBossDamage("EASY")).toBe(10);
+      expect(calculateBossDamage("MEDIUM")).toBe(25);
+      expect(calculateBossDamage("HARD")).toBe(50);
+      expect(calculateBossDamage("EPIC")).toBe(100);
+    });
+
+    it("applies damage without defeating boss when HP > damage", () => {
+      const result = applyBossDamage(100, 25);
+      expect(result.remainingHp).toBe(75);
+      expect(result.isDefeated).toBe(false);
+    });
+
+    it("defeats boss when damage equals remaining HP", () => {
+      const result = applyBossDamage(25, 25);
+      expect(result.remainingHp).toBe(0);
+      expect(result.isDefeated).toBe(true);
+    });
+
+    it("clamps HP at 0 on overkill and marks as defeated", () => {
+      const result = applyBossDamage(30, 50);
+      expect(result.remainingHp).toBe(0);
+      expect(result.isDefeated).toBe(true);
+    });
+
+    it("calculates boss victory bonus rewards based on max HP", () => {
+      const reward50 = calculateBossRewards(50);
+      expect(reward50.xp).toBe(50);
+      expect(reward50.diamonds).toBe(5);
+
+      const reward200 = calculateBossRewards(200);
+      expect(reward200.xp).toBe(200);
+      expect(reward200.diamonds).toBe(10);
+    });
+  });
+
+  describe("Quest Chains Engine", () => {
+    it("returns zero progress for empty chain", () => {
+      const result = calculateChainProgress([]);
+      expect(result.totalSteps).toBe(0);
+      expect(result.completedSteps).toBe(0);
+      expect(result.progressPct).toBe(0);
+      expect(result.isCompleted).toBe(false);
+    });
+
+    it("calculates step progress and completion percentage", () => {
+      const quests = [
+        { completions: [{ completedAt: new Date() }] },
+        { completions: [] },
+        { completions: [] },
+        { completions: [] },
+      ];
+      const result = calculateChainProgress(quests);
+      expect(result.totalSteps).toBe(4);
+      expect(result.completedSteps).toBe(1);
+      expect(result.progressPct).toBe(25);
+      expect(result.currentChapterIndex).toBe(1);
+      expect(result.isCompleted).toBe(false);
+    });
+
+    it("detects fully completed chain", () => {
+      const quests = [
+        { completions: [{ completedAt: new Date() }] },
+        { completions: [{ completedAt: new Date() }] },
+      ];
+      const result = calculateChainProgress(quests);
+      expect(result.totalSteps).toBe(2);
+      expect(result.completedSteps).toBe(2);
+      expect(result.progressPct).toBe(100);
+      expect(result.isCompleted).toBe(true);
+    });
+  });
 });
+
