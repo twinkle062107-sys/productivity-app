@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BlobMascot } from "@/components/brand/mascots";
 import { ProgressRing } from "@/components/brand/progress-ring";
@@ -51,6 +51,10 @@ export function DashboardClient({
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
   const [boss, setBoss] = useState<BossData | null>(initialBoss);
   const [chains, setChains] = useState<QuestChainData[]>(initialChains);
+  const [prevInitialUser, setPrevInitialUser] = useState(initialUser);
+  const [prevInitialQuests, setPrevInitialQuests] = useState(initialQuests);
+  const [prevInitialBoss, setPrevInitialBoss] = useState(initialBoss);
+  const [prevInitialChains, setPrevInitialChains] = useState(initialChains);
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
   const [freezeUsedToast, setFreezeUsedToast] = useState(false);
   const [freezeDialogOpen, setFreezeDialogOpen] = useState(false);
@@ -58,21 +62,22 @@ export function DashboardClient({
   const [unlockedAchievementModal, setUnlockedAchievementModal] =
     useState<UnlockedAchievementInfo | null>(null);
 
-  useEffect(() => {
-    setQuests(initialQuests);
-  }, [initialQuests]);
-
-  useEffect(() => {
+  if (prevInitialUser !== initialUser) {
+    setPrevInitialUser(initialUser);
     setUser(initialUser);
-  }, [initialUser]);
-
-  useEffect(() => {
+  }
+  if (prevInitialQuests !== initialQuests) {
+    setPrevInitialQuests(initialQuests);
+    setQuests(initialQuests);
+  }
+  if (prevInitialBoss !== initialBoss) {
+    setPrevInitialBoss(initialBoss);
     setBoss(initialBoss);
-  }, [initialBoss]);
-
-  useEffect(() => {
+  }
+  if (prevInitialChains !== initialChains) {
+    setPrevInitialChains(initialChains);
     setChains(initialChains);
-  }, [initialChains]);
+  }
 
   const completedCount = quests.filter((q) => q.isCompletedToday).length;
   const totalCount = quests.length;

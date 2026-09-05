@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import {
   type NotificationPreferences,
@@ -14,6 +14,7 @@ import {
   requestBrowserNotificationPermission,
   sendNativeNotification,
 } from "@/lib/notifications/browser";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 
 interface NotificationSettingsDialogProps {
   isOpen: boolean;
@@ -33,16 +34,17 @@ export function NotificationSettingsDialog({
   onClose,
   onPreferencesChanged,
 }: NotificationSettingsDialogProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
   const [permission, setPermission] = useState<NotificationPermissionStatus>("default");
   const [prefs, setPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [testSent, setTestSent] = useState(false);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  useEffect(() => {
-    setMounted(true);
+  if (isOpen && !prevIsOpen) {
+    setPrevIsOpen(isOpen);
     setPrefs(getStoredNotificationPrefs());
     setPermission(getBrowserNotificationPermission());
-  }, [isOpen]);
+  }
 
   if (!mounted || !isOpen) return null;
 

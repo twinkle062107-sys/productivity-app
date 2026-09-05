@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { buyStreakFreezeAction } from "@/lib/actions/freeze";
 import { STREAK_FREEZE_COST, MAX_STREAK_FREEZES } from "@/lib/gamification";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 
 interface StreakFreezeDialogProps {
   isOpen: boolean;
@@ -20,14 +21,10 @@ export function StreakFreezeDialog({
   streakFreezes,
   onFreezePurchased,
 }: StreakFreezeDialogProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted || !isOpen) return null;
 

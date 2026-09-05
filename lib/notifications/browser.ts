@@ -3,8 +3,6 @@ import {
   type NotificationPermissionStatus,
   DEFAULT_NOTIFICATION_PREFERENCES,
   NOTIFICATION_STORAGE_KEY,
-  LAST_REMINDER_DATE_KEY,
-  LAST_STREAK_WARN_DATE_KEY,
 } from "./types";
 import { soundEngine } from "./sound";
 

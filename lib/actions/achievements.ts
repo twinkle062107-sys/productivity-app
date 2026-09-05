@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import {
@@ -13,14 +12,6 @@ import {
 } from "@/lib/gamification/achievements";
 import type { ActionResult } from "@/lib/actions/quest";
 import type { Prisma } from "@prisma/client";
-
-function safeRevalidate(path: string) {
-  try {
-    revalidatePath(path);
-  } catch {
-    // Non-fatal if invoked outside Next.js request context
-  }
-}
 
 async function requireUser() {
   const session = await auth();

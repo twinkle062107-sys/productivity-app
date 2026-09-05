@@ -3,6 +3,7 @@ import Link from "next/link";
 const tabs = [
   { href: "/dashboard", label: "Home", icon: HomeIcon },
   { href: "/quests", label: "Quests", icon: ListIcon },
+  { href: "/coach", label: "Coach", icon: CoachIcon },
   { href: "/achievements", label: "Stats", icon: ChartIcon },
   { href: "/profile", label: "Profile", icon: UserIcon },
 ] as const;
@@ -45,6 +46,16 @@ function ListIcon() {
       <circle cx="4" cy="7" r="1.2" fill="currentColor" stroke="none" />
       <circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none" />
       <circle cx="4" cy="17" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function CoachIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+      <path d="M12 3a9 9 0 1 0 9 9" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="white" stroke="none" />
     </svg>
   );
 }

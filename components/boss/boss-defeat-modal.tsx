@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { type BossDefeatedInfo } from "@/lib/actions/quest";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 
 export function BossDefeatModal({
   info,
@@ -11,11 +11,7 @@ export function BossDefeatModal({
   info: BossDefeatedInfo;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHasMounted();
 
   if (!mounted) return null;
 

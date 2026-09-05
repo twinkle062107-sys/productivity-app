@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { createChainAction, type QuestChainData } from "@/lib/actions/chain";
 import type { Difficulty } from "@/lib/gamification";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 
 const PRESET_CHAINS = [
   {
@@ -42,7 +43,7 @@ export function CreateChainDialog({
   onChainCreated: (chain: QuestChainData) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
   const [title, setTitle] = useState("");
   const [narrative, setNarrative] = useState("");
   const [chapters, setChapters] = useState<
@@ -53,10 +54,6 @@ export function CreateChainDialog({
   ]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleSelectPreset = (preset: (typeof PRESET_CHAINS)[0]) => {
     setTitle(preset.title);

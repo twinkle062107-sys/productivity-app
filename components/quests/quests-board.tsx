@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateQuestDialog } from "@/components/quests/create-quest-dialog";
 import { QuestItem, type QuestData } from "@/components/quests/quest-item";
@@ -18,14 +18,16 @@ export function QuestsBoard({
 }) {
   const router = useRouter();
   const [quests, setQuests] = useState<QuestData[]>(initialQuests);
+  const [prevInitialQuests, setPrevInitialQuests] = useState(initialQuests);
   const [filter, setFilter] = useState<"ALL" | "DAILY" | "WEEKLY" | "ONCE">("ALL");
   const [rewardToast, setRewardToast] = useState<QuestCompletionResponse | null>(null);
   const [unlockedAchievementModal, setUnlockedAchievementModal] =
     useState<UnlockedAchievementInfo | null>(null);
 
-  useEffect(() => {
+  if (prevInitialQuests !== initialQuests) {
+    setPrevInitialQuests(initialQuests);
     setQuests(initialQuests);
-  }, [initialQuests]);
+  }
 
   const handleQuestCompleted = (res: QuestCompletionResponse) => {
     setQuests((prev) =>

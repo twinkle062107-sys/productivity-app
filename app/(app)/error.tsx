@@ -3,7 +3,6 @@
 import { BlobMascot } from "@/components/brand/mascots";
 
 export default function AppError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };

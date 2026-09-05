@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
   deleteQuestAction,
   type QuestDetailData,
 } from "@/lib/actions/quest";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 import {
   XP_BY_DIFFICULTY,
   DIAMONDS_BY_DIFFICULTY,
@@ -39,7 +40,7 @@ export function EditQuestDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
   const [title, setTitle] = useState(quest.title);
   const [description, setDescription] = useState(quest.description || "");
   const [category, setCategory] = useState(quest.category || "Focus");
@@ -50,10 +51,6 @@ export function EditQuestDialog({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleOpen = () => {
     setTitle(quest.title);

@@ -6,7 +6,6 @@ import { auth } from "@/lib/auth";
 import {
   calculateRewards,
   calculateLevel,
-  calculateStreak,
   calculateStreakWithFreeze,
   isQuestCompletedForOccurrence,
   calculateBossDamage,
@@ -246,8 +245,6 @@ export async function completeQuestAction(
 
     let bossDamage: BossDamageInfo | undefined;
     let bossDefeated: BossDefeatedInfo | undefined;
-    let bossUpdateOp = null;
-    let bossDefeatEventOp = null;
 
     if (activeBoss) {
       const dmg = calculateBossDamage(quest.difficulty as Difficulty);
@@ -263,28 +260,6 @@ export async function completeQuestAction(
           bonusXp: bossLoot.xp,
           bonusDiamonds: bossLoot.diamonds,
         };
-
-        bossUpdateOp = prisma.boss.update({
-          where: { id: activeBoss.id },
-          data: {
-            currentHp: 0,
-            defeatedAt: now,
-          },
-        });
-
-        bossDefeatEventOp = prisma.event.create({
-          data: {
-            userId: user.id,
-            type: "BOSS_DEFEATED",
-            payload: JSON.stringify({
-              bossId: activeBoss.id,
-              title: activeBoss.title,
-              maxHp: activeBoss.maxHp,
-              bonusXp: bossLoot.xp,
-              bonusDiamonds: bossLoot.diamonds,
-            }),
-          },
-        });
       } else {
         bossDamage = {
           damage: dmg,
@@ -292,20 +267,11 @@ export async function completeQuestAction(
           maxHp: activeBoss.maxHp,
           bossTitle: activeBoss.title,
         };
-
-        bossUpdateOp = prisma.boss.update({
-          where: { id: activeBoss.id },
-          data: {
-            currentHp: bossResult.remainingHp,
-          },
-        });
       }
     }
 
     // Quest Chain progression calculation
     let chainCompleted: ChainCompletedInfo | undefined;
-    let chainUpdateOp = null;
-    let chainEventOp = null;
 
     if (quest.chainId && quest.chain && !quest.chain.completedAt) {
       const siblingQuests = await prisma.quest.findMany({
@@ -331,24 +297,6 @@ export async function completeQuestAction(
           bonusXp: chainBonusXp,
           bonusDiamonds: chainBonusDiamonds,
         };
-
-        chainUpdateOp = prisma.questChain.update({
-          where: { id: quest.chainId },
-          data: { completedAt: now },
-        });
-
-        chainEventOp = prisma.event.create({
-          data: {
-            userId: user.id,
-            type: "CHAIN_COMPLETED",
-            payload: JSON.stringify({
-              chainId: quest.chainId,
-              title: quest.chain.title,
-              bonusXp: chainBonusXp,
-              bonusDiamonds: chainBonusDiamonds,
-            }),
-          },
-        });
       }
     }
 

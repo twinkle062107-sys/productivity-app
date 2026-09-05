@@ -6,8 +6,6 @@ import {
   calculateStreakWithFreeze,
   isQuestCompletedForOccurrence,
   toUtcDayKey,
-  XP_BY_DIFFICULTY,
-  DIAMONDS_BY_DIFFICULTY,
   calculateBossDamage,
   applyBossDamage,
   calculateBossRewards,

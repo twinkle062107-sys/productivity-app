@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { UnlockedAchievementInfo } from "@/lib/actions/quest";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 
 export function AchievementUnlockModal({
   achievement,
@@ -11,11 +11,7 @@ export function AchievementUnlockModal({
   achievement: UnlockedAchievementInfo;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHasMounted();
 
   if (!mounted) return null;
 

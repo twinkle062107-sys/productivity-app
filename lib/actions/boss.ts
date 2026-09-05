@@ -3,11 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import {
-  applyBossDamage,
-  calculateBossRewards,
-  calculateLevel,
-} from "@/lib/gamification";
 import { bossDraftSchema, type BossDraft } from "@/lib/validations/boss";
 import type { ActionResult } from "@/lib/actions/quest";
 

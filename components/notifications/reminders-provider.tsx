@@ -38,7 +38,9 @@ export function useReminders() {
 
 export function RemindersProvider({ children }: { children: ReactNode }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [prefs, setPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [prefs, setPrefs] = useState<NotificationPreferences>(() =>
+    getStoredNotificationPrefs()
+  );
 
   const openNotificationSettings = useCallback(() => {
     setDialogOpen(true);
@@ -47,7 +49,6 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
   // Periodic check function
   const runReminderCheck = useCallback(() => {
     const currentPrefs = getStoredNotificationPrefs();
-    setPrefs(currentPrefs);
 
     if (!currentPrefs.enabled) return;
 

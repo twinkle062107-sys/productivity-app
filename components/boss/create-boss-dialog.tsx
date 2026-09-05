@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { createBossAction, type BossData } from "@/lib/actions/boss";
+import { useHasMounted } from "@/lib/hooks/use-has-mounted";
 
 const PRESET_BOSSES = [
   { title: "Sloth Slime", maxHp: 50, emoji: "🟢", desc: "Easy warmup encounter" },
@@ -17,15 +18,11 @@ export function CreateBossDialog({
   onBossCreated: (boss: BossData) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
   const [title, setTitle] = useState("");
   const [maxHp, setMaxHp] = useState<number>(100);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleSelectPreset = (preset: (typeof PRESET_BOSSES)[0]) => {
     setTitle(preset.title);

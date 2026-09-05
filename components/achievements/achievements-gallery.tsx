@@ -5,7 +5,6 @@ import { AchievementCard } from "@/components/achievements/achievement-card";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import type {
   AchievementsGalleryData,
-  AchievementItemData,
 } from "@/lib/actions/achievements";
 import type { AchievementCategory } from "@/lib/gamification/achievements";
 
