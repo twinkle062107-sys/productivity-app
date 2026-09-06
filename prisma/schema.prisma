@@ -26,6 +26,7 @@ model User {
 
   accounts     Account[]
   sessions     Session[]
+  apiTokens    ApiToken[]
   quests       Quest[]
   bosses       Boss[]
   chains       QuestChain[]
@@ -35,6 +36,17 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ApiToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
 model Account {
